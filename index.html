@@ -1,0 +1,2761 @@
+<!DOCTYPE html>
+<html lang="ja" class="ui-dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b1014">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="症例ノート">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>CT・MRI 救急症例ノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* 読影室の暗さ：濃紺の地＋ティール。所見はアンバー、解剖はシアン。左に一覧、右に画像と解説 */
+:root{
+  --paper:#0b1014; --panel:#141c22; --ink:#e4ebee; --muted:#93a4ae; --line:#26333c;
+  --accent:#45b5bf; --accent-soft:#163038; --on-accent:#0b1014; --find:#e39b2d; --anat:#5fd0e2;
+  --find-ui:#e39b2d; --anat-ui:#5fd0e2; --sevr:#3a4852;
+  --crit:#e2655b; --urg:#e39545; --rout:#93a4ae; --ok:#5cbf83;
+  --display:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  --body:"Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+/* 表示テーマ：html に ui-dark / ui-light / ui-auto のクラスを付けて切り替える（模式図の注釈色は常に明るいまま） */
+:root.ui-light{
+  --paper:#f2f5f6; --panel:#ffffff; --ink:#15212b; --muted:#5b6b76; --line:#d6dee3;
+  --accent:#0d7480; --accent-soft:#e1f0f1; --on-accent:#ffffff; --find-ui:#b8740f; --anat-ui:#1c8fa3; --sevr:#d6dee3;
+  --crit:#b83229; --urg:#c9701a; --rout:#5b6b76; --ok:#2f7d4f;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:light){
+  :root.ui-auto{
+    --paper:#f2f5f6; --panel:#ffffff; --ink:#15212b; --muted:#5b6b76; --line:#d6dee3;
+    --accent:#0d7480; --accent-soft:#e1f0f1; --on-accent:#ffffff; --find-ui:#b8740f; --anat-ui:#1c8fa3; --sevr:#d6dee3;
+    --crit:#b83229; --urg:#c9701a; --rout:#5b6b76; --ok:#2f7d4f;
+    color-scheme:light;
+  }
+}
+.themesw{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:2px;gap:2px}
+.themesw button{border:0;background:transparent;border-radius:999px;padding:3px 11px;font-size:.78rem;color:var(--muted)}
+.themesw button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:700}
+.topright{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.75}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.35}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header.top{padding-top:max(16px,env(safe-area-inset-top));display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 24px;padding:16px clamp(16px,3vw,32px);border-bottom:1px solid var(--line);background:var(--panel)}
+.brand h1{font-size:1.3rem}
+.brand p{margin:0;color:var(--muted);font-size:.82rem}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap}
+nav.tabs button{border:1px solid var(--line);background:transparent;padding:6px 14px;border-radius:999px;font-size:.88rem}
+nav.tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700}
+
+main{padding:20px clamp(16px,3vw,32px) 40px;max-width:1280px;margin:0 auto}
+.view[hidden]{display:none}
+
+/* 図鑑 */
+.atlas{display:grid;grid-template-columns:290px 1fr;gap:20px;align-items:start}
+@media (max-width:860px){.atlas{grid-template-columns:1fr}}
+.search{width:100%;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;margin-bottom:10px}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{border:1px solid var(--line);background:var(--panel);padding:3px 11px;border-radius:999px;font-size:.8rem;line-height:1.6}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:700}
+.chip .n{font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-left:3px}
+.caselist{display:flex;flex-direction:column;gap:5px;max-height:calc(100vh - 230px);overflow:auto;padding-right:4px}
+@media (max-width:860px){.caselist{max-height:340px}}
+.listhead{flex-shrink:0;font-size:.75rem;color:var(--muted);font-weight:700;margin:8px 0 2px}
+.caseitem{flex-shrink:0;display:grid;grid-template-columns:5px 1fr;gap:10px;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px 7px 0;overflow:hidden}
+.caseitem strong{display:block;font-size:.9rem;line-height:1.4;font-weight:500}
+.caseitem small{color:var(--muted);font-size:.74rem}
+.caseitem[aria-current="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.sev-crit{background:var(--crit)} .sev-urg{background:var(--urg)} .sev-rout{background:var(--sevr)}
+.count{font-size:.78rem;color:var(--muted);margin-bottom:4px}
+.modfilter{border-top:1px solid var(--line);padding-top:8px;margin-bottom:10px}
+.modfilter .lab{font-size:.74rem;color:var(--muted);margin-bottom:4px;display:block}
+.modfilter .row{display:flex;gap:6px;flex-wrap:wrap}
+.modfilter .sub{margin-top:6px;padding-left:10px;border-left:2px solid var(--accent-soft)}
+.modfilter .sub .chip{font-size:.75rem;padding:2px 9px}
+.modtag{display:inline-block;font-size:.7rem;padding:0 6px;border-radius:4px;border:1px solid var(--line);margin-left:4px;color:var(--muted)}
+
+.detail{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:clamp(16px,2.5vw,26px)}
+.dhead{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:baseline;margin-bottom:14px}
+.dhead h2{font-size:1.45rem}
+.tag{font-size:.75rem;padding:1px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.tag.crit{border-color:var(--crit);color:var(--crit);font-weight:700}
+.tag.urg{border-color:var(--urg);color:var(--urg);font-weight:700}
+.dgrid{display:grid;grid-template-columns:minmax(260px,400px) 1fr;gap:24px;align-items:start}
+@media (max-width:1040px){.dgrid{grid-template-columns:1fr}}
+.imgpanel{position:sticky;top:12px}
+.scanwrap{background:#000;border-radius:10px;overflow:hidden;max-width:400px}
+svg.scan{display:block;width:100%;height:auto}
+svg.scan .ann,svg.scan .anat{display:none}
+svg.scan.show-ann .ann,svg.scan.show-anat .anat{display:inline}
+svg.scan text{font-family:var(--body);font-size:8.6px;font-weight:700;paint-order:stroke;stroke:#000;stroke-width:2.6px}
+svg.scan .ann text{fill:var(--find)}
+svg.scan .ann line,svg.scan .ann .ol{stroke:var(--find);stroke-width:1.3;fill:none}
+svg.scan .ann circle.dot{fill:var(--find)}
+svg.scan .anat text{fill:var(--anat)}
+svg.scan .anat line{stroke:var(--anat);stroke-width:.9;opacity:.85}
+svg.scan .anat circle.dot{fill:var(--anat)}
+svg.scan .quizmark circle{fill:none;stroke:var(--anat);stroke-width:2}
+svg.scan .quizmark circle+circle{fill:var(--anat)}
+.imgtools{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.layer{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.layer button{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:3px 10px;font-size:.8rem;display:inline-flex;align-items:center;gap:6px}
+.layer button::before{content:"";width:9px;height:9px;border-radius:50%;border:2px solid currentColor}
+.layer button.find{color:var(--find-ui)} .layer button.anatb{color:var(--anat-ui)}
+.layer button[aria-pressed="true"]::before{background:currentColor}
+.caption{font-size:.8rem;color:var(--muted);margin:8px 0 0;line-height:1.65}
+.wl{font-family:var(--mono);font-size:.72rem;color:var(--muted);margin:6px 0 0}
+.tplname{font-size:.74rem;color:var(--muted);margin-top:6px}
+
+.sections{display:flex;flex-direction:column;gap:16px;max-width:68ch}
+.sections h3{font-size:1rem;display:flex;gap:8px;align-items:center;margin-bottom:4px}
+.sections h3::before{content:"";width:4px;height:1em;background:var(--accent);border-radius:2px}
+.sections ul{margin:0;padding-left:1.2em}
+.sections li+li{margin-top:2px}
+.alert{border:1px solid var(--crit);border-left-width:5px;border-radius:8px;padding:10px 14px;background:color-mix(in srgb,var(--crit) 6%,var(--panel))}
+.alert h3::before{background:var(--crit)}
+.tech{border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:var(--accent-soft)}
+.keychips{display:flex;flex-wrap:wrap;gap:5px}
+
+/* 症状検索 */
+.symwrap{display:grid;grid-template-columns:minmax(300px,1fr) minmax(300px,1fr);gap:22px;align-items:start}
+@media (max-width:900px){.symwrap{grid-template-columns:1fr}}
+.symgroup{margin-bottom:12px}
+.symgroup h3{font-size:.85rem;color:var(--muted);margin-bottom:5px}
+.symgroup .chips{display:flex;flex-wrap:wrap;gap:5px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+.selected{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:30px;margin-bottom:10px}
+.results{display:flex;flex-direction:column;gap:8px}
+.result-item{display:grid;grid-template-columns:5px 1fr auto;gap:12px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:9px 12px 9px 0;overflow:hidden}
+.result-item strong{display:block;font-weight:700;font-size:.95rem}
+.result-item small{color:var(--muted);font-size:.76rem;display:block}
+.match{font-family:var(--mono);font-size:.82rem;color:var(--accent);white-space:nowrap}
+.bar{height:4px;border-radius:2px;background:var(--accent-soft);margin-top:4px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--accent)}
+.hint{color:var(--muted);font-size:.85rem}
+
+/* クイズ */
+.quiz{max-width:900px;margin:0 auto}
+.qsetup{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:14px}
+.qsetup fieldset{border:0;padding:0;margin:0}
+.qsetup legend{font-size:.78rem;color:var(--muted);margin-bottom:4px}
+.qbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.progress{font-family:var(--mono);font-size:.85rem;color:var(--muted)}
+.qcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:clamp(16px,2.5vw,26px);display:grid;grid-template-columns:minmax(200px,320px) 1fr;gap:22px;align-items:start}
+.qcard.noimg{grid-template-columns:1fr}
+@media (max-width:720px){.qcard{grid-template-columns:1fr}}
+.qcard .kind{font-size:.75rem;color:var(--accent);font-weight:700;letter-spacing:.04em}
+.qcard h2{font-size:1.1rem;margin:2px 0 12px}
+.qcard .stem{margin:0 0 12px;padding:10px 14px;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0;font-size:.92rem}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:9px 14px;line-height:1.55}
+.opt:hover:not([disabled]){border-color:var(--accent)}
+.opt.correct{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,var(--panel));font-weight:700}
+.opt.wrong{border-color:var(--crit);background:color-mix(in srgb,var(--crit) 10%,var(--panel))}
+.opt[disabled]{cursor:default}
+.feedback{margin-top:14px;padding:12px 14px;border-radius:8px;background:var(--accent-soft);font-size:.92rem}
+.feedback b.good{color:var(--ok)} .feedback b.bad{color:var(--crit)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);border-radius:8px;padding:7px 16px;font-weight:700}
+.btn.ghost{background:transparent;color:var(--accent)}
+.result{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px}
+.result .score{font-family:var(--mono);font-size:2.4rem;color:var(--accent)}
+.intro{color:var(--muted);font-size:.9rem;max-width:70ch;margin:0 0 14px}
+
+footer{max-width:1280px;margin:0 auto;padding:0 clamp(16px,3vw,32px) 32px;color:var(--muted);font-size:.78rem}
+@media (prefers-reduced-motion:no-preference){.opt,.chip,.caseitem,.result-item{transition:border-color .15s,background .15s}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>CT・MRI 救急症例ノート</h1>
+    <p>新人診療放射線技師のための症例学習（試作版 v0.4・100症例）</p>
+  </div>
+  <div class="topright">
+  <div class="themesw" role="group" aria-label="表示テーマ">
+    <button data-theme-set="light">ライト</button><button data-theme-set="dark">ダーク</button><button data-theme-set="auto">端末に合わせる</button>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="モード">
+    <button role="tab" aria-selected="true" data-view="atlas">症例図鑑</button>
+    <button role="tab" aria-selected="false" data-view="symptom">症状から探す</button>
+    <button role="tab" aria-selected="false" data-view="quiz">クイズ</button>
+    <button role="tab" aria-selected="false" data-view="report">緊急所見トレーニング</button>
+  </nav>
+  </div>
+</header>
+
+<main>
+  <section class="view" id="view-atlas">
+    <div class="atlas">
+      <aside>
+        <input class="search" id="q" type="search" placeholder="疾患名・略語・撮像法で検索（例：SAH、解離、DWI）" aria-label="症例を検索">
+        <div class="filters" id="filters"></div>
+        <div class="modfilter" id="modfilter" aria-label="モダリティで絞り込み"></div>
+        <div class="count" id="count"></div>
+        <div class="caselist" id="caselist"></div>
+      </aside>
+      <article class="detail" id="detail"></article>
+    </div>
+  </section>
+
+  <section class="view" id="view-symptom" hidden>
+    <p class="intro">当てはまる症状・背景を選ぶと、疑われる疾患を一致数の多い順に表示します。学習用の目安で、診断ツールではありません。</p>
+    <div class="symwrap">
+      <div class="panel" id="symchips"></div>
+      <div class="panel">
+        <div class="selected" id="symselected"></div>
+        <div class="results" id="symresults"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="view-quiz" hidden>
+    <div class="quiz">
+      <div class="qsetup" id="qsetup"></div>
+      <div id="quiz-root"></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-report" hidden>
+    <div class="quiz">
+      <p class="intro">撮影中・撮影直後に気づいた所見に対して、技師としてどう動くかを考える練習です。対応の最終判断は施設のルールと医師の指示に従ってください。</p>
+      <div class="qsetup" id="rsetup"></div>
+      <div id="report-root"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  画像はすべて学習用に単純化した模式図で、実際の濃度・形態・断面とは異なります（解剖は各テンプレートの代表的な構造のみ）。内容は教育目的の一般的な知識で、撮像条件・ウィンドウ値は目安です。各施設のプロトコルと医師の判断を優先してください。
+</footer>
+
+<script>/* templates.js */
+/* 模式図テンプレート
+   各テンプレートは (p, o) => {under, over, anat} を返す。
+   p: 撮像条件ごとの色（PAL）、o: オプション。
+   症例の病変（les）は under と over の間に描かれ、{key} は p[key] に置き換わる。
+   anat: [x, y, tx, ty, 名前] 解剖ラベル（構造上の点 → ラベル位置）。 */
+
+const BASE_KEYS = {bone:0,marrow:0,wm:0,gm:0,csf:0,fat:0,soft:0,organ:0,air:0,lung:0,blood:0,vessel:0,fluid:0,lig:0,disc:0,nucleus:0,cord:0,cart:0,lens:0};
+
+const PAL = {
+  CT:   {bone:"#ececec",marrow:"#bdbdbd",wm:"#7a7a7a",gm:"#8a8a8a",csf:"#2c2c2c",fat:"#383838",soft:"#696969",organ:"#858585",air:"#030303",lung:"#141414",blood:"#d8d8d8",vessel:"#8a8a8a",fluid:"#535353",lig:"#6a6a6a",disc:"#757575",nucleus:"#757575",cord:"#747474",cart:"#6a6a6a",lens:"#a6a6a6"},
+  CTL:  {bone:"#ffffff",marrow:"#f0f0f0",wm:"#cfcfcf",gm:"#d2d2d2",csf:"#bdbdbd",fat:"#a2a2a2",soft:"#c6c6c6",organ:"#cacaca",air:"#000000",lung:"#2c2c2c",blood:"#d6d6d6",vessel:"#cccccc",fluid:"#c0c0c0",lig:"#c6c6c6",disc:"#c8c8c8",nucleus:"#c8c8c8",cord:"#c8c8c8",cart:"#c6c6c6",lens:"#d0d0d0"},
+  CTB:  {bone:"#f4f4f4",marrow:"#8c8c8c",wm:"#5c5c5c",gm:"#5e5e5e",csf:"#525252",fat:"#4a4a4a",soft:"#5c5c5c",organ:"#5e5e5e",air:"#000000",lung:"#0a0a0a",blood:"#606060",vessel:"#5e5e5e",fluid:"#565656",lig:"#5c5c5c",disc:"#5e5e5e",nucleus:"#5e5e5e",cord:"#5e5e5e",cart:"#5c5c5c",lens:"#606060"},
+  T1:   {bone:"#141414",marrow:"#cacaca",wm:"#9c9c9c",gm:"#727272",csf:"#2a2a2a",fat:"#e4e4e4",soft:"#545454",organ:"#7a7a7a",air:"#000000",lung:"#080808",blood:"#808080",vessel:"#1a1a1a",fluid:"#2e2e2e",lig:"#121212",disc:"#6a6a6a",nucleus:"#6a6a6a",cord:"#7c7c7c",cart:"#707070",lens:"#7a7a7a"},
+  T2:   {bone:"#121212",marrow:"#9a9a9a",wm:"#5a5a5a",gm:"#7c7c7c",csf:"#f0f0f0",fat:"#bcbcbc",soft:"#444444",organ:"#5a5a5a",air:"#000000",lung:"#0a0a0a",blood:"#3a3a3a",vessel:"#0e0e0e",fluid:"#ececec",lig:"#0c0c0c",disc:"#3c3c3c",nucleus:"#e6e6e6",cord:"#7a7a7a",cart:"#8e8e8e",lens:"#2a2a2a"},
+  FLAIR:{bone:"#121212",marrow:"#9a9a9a",wm:"#6a6a6a",gm:"#7e7e7e",csf:"#1e1e1e",fat:"#bcbcbc",soft:"#444444",organ:"#5a5a5a",air:"#000000",lung:"#0a0a0a",blood:"#555555",vessel:"#0e0e0e",fluid:"#2a2a2a",lig:"#0c0c0c",disc:"#3c3c3c",nucleus:"#6a6a6a",cord:"#7a7a7a",cart:"#8e8e8e",lens:"#2a2a2a"},
+  DWI:  {bone:"#1e1e1e",marrow:"#2a2a2a",wm:"#4a4a4a",gm:"#565656",csf:"#181818",fat:"#262626",soft:"#3a3a3a",organ:"#444444",air:"#000000",lung:"#050505",blood:"#3a3a3a",vessel:"#222222",fluid:"#1c1c1c",lig:"#222222",disc:"#333333",nucleus:"#333333",cord:"#4a4a4a",cart:"#333333",lens:"#2a2a2a"},
+  T2S:  {bone:"#121212",marrow:"#8a8a8a",wm:"#5c5c5c",gm:"#767676",csf:"#c8c8c8",fat:"#a8a8a8",soft:"#444444",organ:"#5a5a5a",air:"#000000",lung:"#0a0a0a",blood:"#0c0c0c",vessel:"#101010",fluid:"#c8c8c8",lig:"#0c0c0c",disc:"#3c3c3c",nucleus:"#c0c0c0",cord:"#767676",cart:"#8a8a8a",lens:"#2a2a2a"},
+  STIR: {bone:"#121212",marrow:"#3a3a3a",wm:"#5a5a5a",gm:"#6a6a6a",csf:"#eeeeee",fat:"#2a2a2a",soft:"#4a4a4a",organ:"#5a5a5a",air:"#000000",lung:"#050505",blood:"#5a5a5a",vessel:"#111111",fluid:"#f0f0f0",lig:"#0c0c0c",disc:"#3a3a3a",nucleus:"#d8d8d8",cord:"#6a6a6a",cart:"#8c8c8c",lens:"#2a2a2a"}
+};
+PAL.CTC = {...PAL.CT, vessel:"#efefef", organ:"#a2a2a2", gm:"#8c8c8c"};
+PAL.T1C = {...PAL.T1};
+PAL.PDFS = {...PAL.STIR};
+PAL.T1FS = {...PAL.T1, fat:"#262626", marrow:"#4a4a4a"};
+
+/* 撮像条件の表示名 */
+const MOD_NAME = {CT:"単純CT",CTC:"造影CT",CTL:"CT 肺野条件",CTB:"CT 骨条件",T1:"MRI T1強調像",T1C:"MRI 造影T1強調像",T2:"MRI T2強調像",FLAIR:"MRI FLAIR",DWI:"MRI 拡散強調像",T2S:"MRI T2*強調像",STIR:"MRI STIR",PDFS:"MRI 脂肪抑制プロトン密度強調像",T1FS:"MRI 脂肪抑制T1強調像"};
+
+/* 図形ヘルパー */
+const E = (cx,cy,rx,ry,f,x="") => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${f}" ${x}/>`;
+const Ci = (cx,cy,r,f,x="") => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${f}" ${x}/>`;
+const Pa = (d,f,x="") => `<path d="${d}" fill="${f}" ${x}/>`;
+const St = (d,s,w,x="") => `<path d="${d}" fill="none" stroke="${s}" stroke-width="${w}" stroke-linecap="round" ${x}/>`;
+/* 楕円の輪郭パス（evenodd で三日月や輪を作る用） */
+const ell = (cx,cy,rx,ry) => `M${cx-rx} ${cy} a${rx} ${ry} 0 1 0 ${2*rx} 0 a${rx} ${ry} 0 1 0 ${-2*rx} 0 `;
+const ring = (a,b,f,x="") => `<path fill-rule="evenodd" d="${ell(...a)}${ell(...b)}" fill="${f}" ${x}/>`;
+const mirrorX = d => d.replace(/([MLQCTA]?)(-?\d+\.?\d*) (-?\d+\.?\d*)/g, (m,c,x,y) => `${c}${240-(+x)} ${y}`);
+
+
+/* ---------- 実画像らしさのための手続き的な描写 ---------- */
+let CLIP = 0;
+function rng(seed){ let s = seed % 2147483647 || 1; return () => { s = s * 16807 % 2147483647; return (s - 1) / 2147483646; }; }
+/* 脳溝：脳表から内側へ向かう曲線 */
+function sulci(cx,cy,rx,ry,col,{n=34,len=[10,18],seed=7,skip=[]}={}){
+  const r = rng(seed); let d = "";
+  for (let k=0;k<n;k++){
+    const t = k*2*Math.PI/n + (r()-0.5)*0.12;
+    if (skip.some(([a,b]) => t>a && t<b)) continue;
+    const ex = cx+rx*Math.cos(t), ey = cy+ry*Math.sin(t);
+    const L = len[0] + r()*(len[1]-len[0]);
+    const ux = (cx-ex), uy = (cy-ey), m = Math.hypot(ux,uy); const nx = ux/m, ny = uy/m;
+    const ix = ex+nx*L, iy = ey+ny*L, w = (r()-0.5)*8;
+    d += `M${ex.toFixed(1)} ${ey.toFixed(1)} Q${(ex+nx*L/2-ny*w).toFixed(1)} ${(ey+ny*L/2+nx*w).toFixed(1)} ${ix.toFixed(1)} ${iy.toFixed(1)} `;
+    if (r()>0.5){ const bx = ex+nx*L*0.45, by = ey+ny*L*0.45, s2 = r()>0.5?1:-1;
+      d += `M${bx.toFixed(1)} ${by.toFixed(1)} l${(nx*5-ny*6*s2).toFixed(1)} ${(ny*5+nx*6*s2).toFixed(1)} `; }
+  }
+  return `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.3" stroke-linecap="round" opacity="0.85"/>`;
+}
+/* 肺血管の樹状分岐（肺の楕円でクリップ） */
+function vesselTree(x,y,ang,len,w,depth,r,out){
+  const x2 = x+Math.cos(ang)*len, y2 = y+Math.sin(ang)*len;
+  out.push(`<path d="M${x.toFixed(1)} ${y.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)}" stroke-width="${w.toFixed(2)}"/>`);
+  if (depth<=0) return;
+  const spread = 0.35 + r()*0.35;
+  vesselTree(x2,y2,ang-spread,len*(0.62+r()*0.2),w*0.66,depth-1,r,out);
+  vesselTree(x2,y2,ang+spread,len*(0.62+r()*0.2),w*0.66,depth-1,r,out);
+}
+function lungVessels(lungs, hila, col, {seed=3, width=2.6, depth=5, opacity=1}={}){
+  const r = rng(seed); let out = "";
+  lungs.forEach((L,i) => {
+    const id = `lc${++CLIP}`, [hx,hy,base] = hila[i], segs = [];
+    [-1.1,-0.4,0.3,1.0].forEach(a => vesselTree(hx,hy,base+a+(r()-0.5)*0.3,14+r()*6,width,depth,r,segs));
+    out += `<clipPath id="${id}"><ellipse cx="${L[0]}" cy="${L[1]}" rx="${L[2]}" ry="${L[3]}"/></clipPath><g clip-path="url(#${id})" stroke="${col}" stroke-linecap="round" opacity="${opacity}">${segs.join("")}</g>`;
+  });
+  return out;
+}
+/* 小脳の葉（folia） */
+function folia(cx,cy,rx,ry,col){
+  let d = ""; for (let i=-3;i<=3;i++){ const y = cy+i*ry/4.2, w = rx*Math.sqrt(Math.max(0,1-(i/4.2)**2))*0.9;
+    d += `M${(cx-w).toFixed(1)} ${(y+2).toFixed(1)} Q${cx} ${(y-3).toFixed(1)} ${(cx+w).toFixed(1)} ${(y+2).toFixed(1)} `; }
+  return `<path d="${d}" fill="none" stroke="${col}" stroke-width="1" opacity="0.8"/>`;
+}
+
+const TPL = {};
+
+/* ---------- 頭部：側脳室レベル ---------- */
+TPL["head-vent"] = { name:"頭部 横断（側脳室・基底核レベル）", draw:(p,o={}) => {
+  const s = o.shift||0;
+  const fhR = "M113 80 Q99 90 102 108 L112 107 Q109 93 117 82Z", phR = "M110 142 Q100 152 98 170 L105 170 Q107 156 115 146Z";
+  const putR = "M84 100 Q72 118 84 138 Q92 118 84 100Z";
+  return {
+  under:`
+    ${E(120,120,93,107,"none",`stroke="${p.fat}" stroke-width="3"`)}
+    ${E(120,120,84,98,p.wm)}
+    ${E(120,120,80,94,"none",`stroke="${p.gm}" stroke-width="6"`)}
+    ${sulci(120,120,83,97,p.csf,{seed:11,skip:[[1.45,1.69],[4.59,4.83]]})}
+    <g transform="translate(${-s},0)">
+      ${St("M66 100 Q61 118 66 138",p.gm,4)}${St("M174 100 Q179 118 174 138",p.gm,4)}
+      ${St("M56 104 Q60 118 56 134",p.csf,2)}${St("M184 104 Q180 118 184 134",p.csf,2)}
+      ${E(96,98,6,10,p.gm)}${E(144,98,6,10,p.gm)}
+      ${Pa(putR,p.gm)}${Pa(mirrorX(putR),p.gm)}
+      ${E(109,126,9,12,p.gm)}${E(131,126,9,12,p.gm)}
+      ${Pa(fhR,p.csf)}${Pa(mirrorX(fhR),p.csf)}
+      <rect x="118.5" y="112" width="3" height="24" fill="${p.csf}"/>
+      ${Pa(phR,p.csf)}${Pa(mirrorX(phR),p.csf)}
+      ${St("M120 24 L120 80",p.csf,1.6)}${St("M120 150 L120 216",p.csf,1.6)}
+    </g>`,
+  over:`${E(120,120,88,102,"none",`stroke="${p.bone}" stroke-width="8"`)}${E(120,120,88,102,"none",`stroke="${p.marrow}" stroke-width="2.4"`)}`,
+  anat:[[92,48,6,22,"前頭葉"],[96,98,6,56,"尾状核頭"],[80,118,6,90,"被殻"],[64,130,6,124,"島皮質"],[109,128,6,158,"視床"],[100,206,6,226,"後頭葉"],
+        [120,40,234,16,"大脳縦裂"],[127,92,234,50,"側脳室前角"],[146,118,234,86,"内包"],[120,124,234,122,"第3脳室"],[138,160,234,166,"側脳室後角"],[206,150,234,204,"頭蓋骨"]]
+};}};
+
+/* ---------- 頭部：脳底槽レベル ---------- */
+const SAH_SHAPES = f => `
+  ${Pa("M120 98 L141 110 L134 132 L106 132 L99 110 Z",f)}
+  ${St("M141 110 Q160 100 180 98",f,6)}${St("M99 110 Q80 100 60 98",f,6)}
+  ${St("M120 98 L120 36",f,3)}
+  ${Ci(120,151,20,f)}`;
+TPL["head-base"] = { name:"頭部 横断（脳底槽・中脳レベル）", draw:(p,o={}) => ({
+  under:`
+    ${E(120,122,93,107,"none",`stroke="${p.fat}" stroke-width="3"`)}
+    ${E(120,122,84,98,p.wm)}
+    ${E(120,122,80,94,"none",`stroke="${p.gm}" stroke-width="6"`)}
+    ${sulci(120,122,83,97,p.csf,{seed:23,n:28,len:[8,14],skip:[[1.2,1.95],[4.59,4.83]]})}
+    ${SAH_SHAPES(p.csf)}
+    ${E(120,151,15,14,p.gm)}
+    ${Pa("M74 136 Q80 132 86 140 Q80 146 74 136Z",p.csf)}${Pa("M166 136 Q160 132 154 140 Q160 146 166 136Z",p.csf)}
+    ${E(120,198,12,14,p.gm)}`,
+  over:`${E(120,122,88,102,"none",`stroke="${p.bone}" stroke-width="8"`)}${E(120,122,88,102,"none",`stroke="${p.marrow}" stroke-width="2.4"`)}`,
+  anat:[[90,56,6,24,"前頭葉（眼窩面）"],[66,150,6,170,"側頭葉"],[80,138,6,130,"側脳室下角"],[106,152,6,206,"迂回槽"],
+        [128,114,234,88,"鞍上槽"],[166,101,234,56,"シルビウス裂"],[120,151,234,150,"中脳"],[120,198,234,212,"小脳虫部"]]
+})};
+
+/* ---------- 頭部：後頭蓋窩（橋）レベル ---------- */
+TPL["head-post"] = { name:"頭部 横断（後頭蓋窩・橋レベル）", draw:(p,o={}) => ({
+  under:`
+    ${E(120,124,93,107,"none",`stroke="${p.fat}" stroke-width="3"`)}
+    ${E(120,124,84,98,p.wm)}
+    ${E(66,92,26,30,p.gm)}${E(174,92,26,30,p.gm)}
+    ${E(88,180,32,28,p.gm)}${E(152,180,32,28,p.gm)}${folia(88,180,30,26,p.csf)}${folia(152,180,30,26,p.csf)}${E(120,184,10,24,p.wm)}
+    ${E(120,128,22,18,p.wm)}
+    ${St("M100 112 Q120 104 140 112",p.csf,3)}
+    ${Pa("M112 146 L128 146 L120 160Z",p.csf)}
+    ${E(120,80,18,12,p.air,`stroke="${p.bone}" stroke-width="2"`)}
+    ${E(120,103,10,6,p.bone)}
+    ${St("M54 140 L100 112",p.bone,9)}${St("M186 140 L140 112",p.bone,9)}
+    ${Ci(48,150,3,p.air)}${Ci(54,156,2.5,p.air)}${Ci(192,150,3,p.air)}${Ci(186,156,2.5,p.air)}`,
+  over:`${E(120,124,88,102,"none",`stroke="${p.bone}" stroke-width="8"`)}${E(120,124,88,102,"none",`stroke="${p.marrow}" stroke-width="2.4"`)}`,
+  anat:[[60,90,6,58,"側頭葉"],[74,128,6,124,"錐体骨"],[86,184,6,206,"小脳半球"],[50,152,6,160,"乳突蜂巣"],
+        [120,80,234,44,"蝶形骨洞"],[124,126,234,104,"橋"],[120,152,234,150,"第4脳室"],[120,192,234,214,"小脳虫部"]]
+})};
+
+/* ---------- 顔面：眼窩レベル ---------- */
+TPL["face-orbit"] = { name:"顔面 横断（眼窩レベル）", draw:(p,o={}) => {
+  const L = (d,w,c) => St(d,c,w)+St(mirrorX(d),c,w);
+  return {
+  under:`
+    ${E(120,128,94,102,p.fat)}
+    ${E(70,170,30,30,p.wm)}${E(170,170,30,30,p.wm)}
+    <rect x="102" y="50" width="36" height="68" fill="${p.air}"/>
+    ${[62,76,90,104].map(y=>St(`M102 ${y} L138 ${y}`,p.bone,1)).join("")}${St("M120 50 L120 118",p.bone,1.2)}
+    ${E(120,142,18,12,p.air,`stroke="${p.bone}" stroke-width="2"`)}
+    ${Ci(80,72,20,p.fluid,`stroke="${p.soft}" stroke-width="2"`)}${Ci(160,72,20,p.fluid,`stroke="${p.soft}" stroke-width="2"`)}
+    ${E(80,55,7,3,p.lens)}${E(160,55,7,3,p.lens)}
+    ${L("M82 92 L108 128",4,p.soft)}
+    ${L("M96 78 L106 118",5,p.soft)}${L("M62 80 L88 120",5,p.soft)}
+    ${L("M56 60 L88 128",5,p.bone)}
+    ${L("M101 56 L108 122",1.6,p.bone)}
+    ${L("M60 132 L100 134",4,p.bone)}
+    ${St("M112 40 Q120 30 128 40",p.bone,4)}`,
+  over:`${St("M28 128 A92 100 0 0 0 212 128",p.bone,6)}`,
+  anat:[[80,55,6,22,"水晶体"],[72,82,6,58,"眼球"],[74,102,6,96,"外直筋"],[96,112,6,132,"視神経"],[72,172,6,196,"側頭葉"],
+        [126,68,234,26,"篩骨洞"],[146,94,234,72,"内直筋"],[134,110,234,108,"眼窩内側壁（紙様板）"],[120,142,234,150,"蝶形骨洞"]]
+};}};
+
+/* ---------- 顔面：上顎洞レベル ---------- */
+const MAXR = "M58 70 Q56 60 70 58 L100 62 Q106 64 104 76 L102 120 Q100 130 90 130 L66 128 Q56 126 56 116Z";
+TPL["face-max"] = { name:"顔面 横断（上顎洞レベル）", draw:(p,o={}) => ({
+  under:`
+    ${E(120,124,94,96,p.fat)}
+    ${E(120,32,18,12,p.soft)}
+    ${Pa(MAXR,p.air,`stroke="${p.bone}" stroke-width="2.5"`)}${Pa(mirrorX(MAXR),p.air,`stroke="${p.bone}" stroke-width="2.5"`)}
+    <rect x="106" y="48" width="28" height="82" rx="4" fill="${p.air}"/>
+    ${St("M120 46 L120 130",p.bone,2)}
+    ${E(111,92,4,20,p.soft)}${E(129,92,4,20,p.soft)}
+    ${E(120,148,16,8,p.air)}
+    ${E(120,160,26,8,p.soft)}
+    ${E(120,178,14,10,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    ${St("M52 80 Q36 110 50 140",p.bone,5)}${St("M188 80 Q204 110 190 140",p.bone,5)}
+    ${E(40,142,8,18,p.soft)}${E(200,142,8,18,p.soft)}
+    ${E(58,150,7,12,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}${E(182,150,7,12,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    ${E(80,154,12,7,p.soft)}${E(160,154,12,7,p.soft)}`,
+  over:"",
+  anat:[[74,94,6,40,"上顎洞"],[46,104,6,96,"頬骨弓"],[58,152,6,150,"下顎骨（関節突起）"],[40,146,6,186,"咬筋"],
+        [120,70,234,30,"鼻中隔"],[129,100,234,80,"下鼻甲介"],[124,148,234,140,"上咽頭"],[120,178,234,190,"斜台"]]
+})};
+
+/* ---------- 頸部：中咽頭レベル ---------- */
+TPL["neck"] = { name:"頸部 横断（中咽頭レベル）", draw:(p,o={}) => ({
+  under:`
+    ${E(120,124,96,80,p.fat)}
+    ${St("M44 92 Q60 36 120 34 Q180 36 196 92",p.bone,7)}
+    ${E(120,72,40,22,p.soft)}
+    ${E(120,108,28,17,p.soft)}
+    ${E(100,106,8,12,p.organ)}${E(140,106,8,12,p.organ)}
+    ${E(120,108,14,8,p.air)}
+    ${E(120,134,24,7,p.soft)}
+    ${E(120,125,20,2.2,p.fat)}
+    ${Ci(120,153,14,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    ${E(120,176,11,9,p.csf)}${E(120,176,6,5,p.cord)}
+    ${St("M106 170 Q100 192 120 200 Q140 192 134 170",p.bone,4)}
+    ${E(92,190,18,12,p.soft)}${E(148,190,18,12,p.soft)}
+    ${Ci(88,132,5,p.vessel)}${Ci(152,132,5,p.vessel)}
+    ${Ci(74,138,7,p.vessel)}${Ci(166,138,7,p.vessel)}
+    ${E(48,140,10,18,p.soft)}${E(192,140,10,18,p.soft)}`,
+  over:"",
+  anat:[[70,60,6,22,"下顎骨"],[100,106,6,92,"口蓋扁桃"],[88,132,6,124,"内頸動脈"],[74,140,6,156,"内頸静脈"],[44,150,6,190,"胸鎖乳突筋"],
+        [120,72,234,30,"舌根"],[128,108,234,84,"中咽頭（気道）"],[132,125,234,116,"咽頭後間隙"],[132,153,234,150,"頸椎椎体"],[124,176,234,184,"脊髄"]]
+})};
+
+/* ---------- 腰椎：正中矢状断 ---------- */
+const LV = [10,52,94,136,178];
+TPL["spine-l"] = { name:"腰椎 矢状断（左が腹側）", draw:(p,o={}) => ({
+  under:`
+    <rect width="62" height="240" fill="${p.soft}"/>
+    <rect x="156" width="84" height="240" fill="${p.soft}"/>
+    <rect x="226" width="14" height="240" fill="${p.fat}"/>
+    ${LV.map(y=>`<rect x="64" y="${y}" width="60" height="32" rx="4" fill="${p.marrow}" stroke="${p.bone}" stroke-width="2"/>
+      <rect x="66" y="${y+32}" width="56" height="10" fill="${p.disc}"/>${E(94,y+37,16,3.4,p.nucleus)}
+      <path d="M156 ${y+4} L176 ${y+2} L214 ${y+8} L214 ${y+26} L176 ${y+30} L156 ${y+28}Z" fill="${p.marrow}" stroke="${p.bone}" stroke-width="1.5"/>
+      ${St(`M153 ${y+30} L153 ${y+44}`,p.lig,3)}`).join("")}
+    <rect x="64" y="220" width="60" height="30" rx="4" fill="${p.marrow}" stroke="${p.bone}" stroke-width="2"/>
+    <rect x="128" width="22" height="240" fill="${p.csf}"/>
+    <rect x="150" width="4" height="240" fill="${p.fat}"/>
+    ${St("M126 0 L126 240",p.lig,1.4)}
+    ${Pa("M135 0 L143 0 L141 26 Q139 32 137 26Z",p.cord)}
+    ${[136,139,142].map(x=>St(`M${x} 28 L${x} 232`,p.cord,1,'opacity="0.75"')).join("")}`,
+  over:"",
+  anat:[[70,26,6,26,"L1"],[70,110,6,110,"L3"],[70,194,6,194,"L5"],[70,232,6,232,"S1"],[72,173,6,160,"椎間板（L4/5）"],
+        [139,18,234,14,"脊髄円錐"],[139,80,234,54,"馬尾"],[147,120,234,98,"硬膜嚢"],[200,146,234,140,"棘突起"],[153,174,234,180,"黄色靱帯"],[220,210,234,228,"傍脊柱筋"]]
+})};
+
+/* ---------- 頸椎：正中矢状断 ---------- */
+const CV = [86,112,138,164,190,216];
+TPL["spine-c"] = { name:"頸椎 矢状断（左が腹側）", draw:(p,o={}) => ({
+  under:`
+    <rect width="20" height="240" fill="${p.soft}"/>
+    <rect x="20" y="30" width="30" height="210" fill="${p.air}"/>
+    <rect x="50" y="20" width="20" height="220" fill="${p.soft}"/>
+    <rect x="146" width="94" height="240" fill="${p.soft}"/>
+    <rect x="226" width="14" height="240" fill="${p.fat}"/>
+    ${St("M30 0 Q60 18 88 22",p.bone,8)}
+    ${E(80,40,6,8,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    <rect x="88" y="18" width="16" height="30" rx="7" fill="${p.marrow}" stroke="${p.bone}" stroke-width="2"/>
+    <rect x="70" y="44" width="38" height="36" rx="3" fill="${p.marrow}" stroke="${p.bone}" stroke-width="2"/>
+    ${CV.map(y=>`<rect x="72" y="${y-6}" width="34" height="6" fill="${p.disc}"/>${E(89,y-3,10,1.8,p.nucleus)}
+      <rect x="70" y="${y}" width="38" height="20" rx="3" fill="${p.marrow}" stroke="${p.bone}" stroke-width="2"/>
+      <path d="M146 ${y+2} L176 ${y+6} L180 ${y+14} L146 ${y+16}Z" fill="${p.marrow}" stroke="${p.bone}" stroke-width="1.5"/>`).join("")}
+    ${Pa("M146 52 L190 58 L194 76 L146 78Z",p.marrow,`stroke="${p.bone}" stroke-width="1.5"`)}
+    ${E(160,36,9,6,p.marrow,`stroke="${p.bone}" stroke-width="1.5"`)}
+    <rect x="112" width="30" height="240" fill="${p.csf}"/>
+    ${Pa("M114 0 L140 0 L134 40 L133 240 L121 240 L120 40Z",p.cord)}
+    ${St("M110 0 L110 240",p.lig,1.2)}`,
+  over:"",
+  anat:[[96,28,6,14,"歯突起"],[80,62,6,58,"C2"],[80,122,6,122,"C4"],[80,200,6,200,"C7"],[60,96,6,90,"椎前軟部組織"],[34,160,6,166,"気道"],
+        [127,20,234,16,"延髄"],[127,100,234,96,"脊髄"],[89,135,234,136,"椎間板"],[170,170,234,176,"棘突起"]]
+})};
+
+/* ---------- 胸部：肺動脈・大動脈レベル（縦隔条件） ---------- */
+TPL["chest"] = { name:"胸部 横断（肺動脈幹レベル）", draw:(p,o={}) => {
+  const ao = o.aorta || p.vessel, pa = o.pa || p.vessel;
+  return {
+  under:`
+    ${E(120,122,112,80,p.fat)}
+    ${E(120,122,103,71,p.soft)}
+    ${E(96,190,16,9,p.soft)}${E(144,190,16,9,p.soft)}
+    ${E(68,118,38,55,p.lung)}${E(172,118,38,55,p.lung)}
+    ${lungVessels([[68,118,38,55],[172,118,38,55]],[[100,112,Math.PI],[140,112,0]],p.soft,{seed:5,width:2.2,depth:4,opacity:0.55})}
+    <rect x="111" y="54" width="18" height="9" rx="3" fill="${p.bone}"/>
+    ${Ci(120,174,15,p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}
+    ${St("M108 186 L104 200 M132 186 L136 200",p.bone,5)}
+    ${Ci(128,152,5,p.soft)}${Ci(128,152,1.6,p.air)}
+    ${Ci(88,96,8,ao)}${Ci(108,108,17,ao)}${Ci(137,99,13,pa)}${Ci(146,158,13,ao)}`,
+  over:"",
+  anat:[[88,96,6,56,"上大静脈"],[100,116,6,96,"上行大動脈"],[56,150,6,170,"右肺"],[112,180,6,216,"椎体"],
+        [120,58,234,24,"胸骨"],[142,92,234,58,"肺動脈幹"],[186,120,234,104,"左肺"],[128,152,234,150,"食道"],[154,164,234,196,"下行大動脈"]]
+};}};
+
+/* ---------- 胸部：心臓レベル ---------- */
+TPL["chest-heart"] = { name:"胸部 横断（心臓レベル）", draw:(p,o={}) => {
+  const bp = o.blood || p.vessel;
+  return {
+  under:`
+    ${E(120,122,112,80,p.fat)}
+    ${E(120,122,103,71,p.soft)}
+    ${E(98,198,15,7,p.soft)}${E(142,198,15,7,p.soft)}
+    ${E(60,120,34,52,p.lung)}${E(184,120,30,50,p.lung)}
+    ${lungVessels([[60,120,34,52],[184,120,30,50]],[[78,118,Math.PI],[166,120,0]],p.soft,{seed:9,width:2,depth:4,opacity:0.5})}
+    ${Ci(120,184,15,p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}
+    ${Ci(150,170,12,o.aorta||p.vessel)}${Ci(128,166,5,p.soft)}${Ci(128,166,1.5,p.air)}
+    ${E(122,118,57,45,p.fat)}
+    ${E(122,118,54,42,p.soft)}
+    ${E(100,104,24,18,o.rv||bp)}${E(150,126,18,17,o.lv||bp)}
+    ${E(78,130,14,12,o.rv||bp)}${E(132,152,18,8,o.lv||bp)}`,
+  over:"",
+  anat:[[96,100,6,50,"右心室"],[74,132,6,130,"右心房"],[66,64,6,24,"心膜（心外膜脂肪）"],[118,186,6,220,"椎体"],
+        [154,124,234,94,"左心室"],[128,116,234,60,"心室中隔"],[136,152,234,140,"左心房"],[128,166,234,176,"食道"],[156,172,234,206,"下行大動脈"]]
+};}};
+
+/* ---------- 胸部：肺野（気管分岐部レベル） ---------- */
+const RIBS = [[30,96],[24,130],[34,166],[62,190],[60,58],[90,48]];
+TPL["chest-lung"] = { name:"胸部 横断（気管分岐部レベル）", draw:(p,o={}) => ({
+  under:`
+    ${E(120,122,112,80,p.fat)}
+    ${E(120,122,103,71,p.soft)}
+    ${E(96,192,16,8,p.soft)}${E(144,192,16,8,p.soft)}
+    ${RIBS.map(([x,y])=>E(x,y,5,4,p.marrow,`stroke="${p.bone}" stroke-width="1.5"`)+E(240-x,y,5,4,p.marrow,`stroke="${p.bone}" stroke-width="1.5"`)).join("")}
+    ${E(70,118,44,62,p.lung)}${E(170,118,44,62,p.lung)}
+    ${St("M96 90 Q66 110 38 150",p.soft,0.8)}${St("M144 90 Q174 110 202 150",p.soft,0.8)}
+    ${lungVessels([[70,118,44,62],[170,118,44,62]],[[104,108,Math.PI],[136,110,0]],p.vessel,{seed:4,width:1.7,depth:5,opacity:0.7})}
+    ${Ci(110,86,13,p.vessel)}${Ci(136,84,12,p.vessel)}
+    ${E(106,106,6,5,p.air,`stroke="${p.soft}" stroke-width="1.5"`)}${E(134,108,6,5,p.air,`stroke="${p.soft}" stroke-width="1.5"`)}
+    ${Ci(146,152,12,p.vessel)}${Ci(126,146,4,p.soft)}
+    ${Ci(120,180,14,p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}`,
+  over:"",
+  anat:[[56,92,6,40,"上葉"],[66,111,6,112,"大葉間裂"],[70,160,6,196,"下葉"],[30,96,6,76,"肋骨"],
+        [106,106,234,36,"右主気管支"],[134,108,234,70,"左主気管支"],[186,96,234,104,"肺血管"],[152,156,234,160,"下行大動脈"],[124,184,234,212,"椎体"]]
+})};
+
+/* ---------- 腹部：肝・脾レベル ---------- */
+const LIVER_UP = "M28 124 Q30 72 96 62 Q138 62 150 86 Q122 110 112 150 Q84 188 44 168 Q28 148 28 124Z";
+function abdShell(p, ry=86){ return `${E(120,124,110,ry,p.fat)}${E(120,126,99,ry-11,o2(p),`stroke="${p.soft}" stroke-width="5"`)}${E(96,196,17,10,p.soft)}${E(144,196,17,10,p.soft)}${E(40,150,7,22,p.soft,'transform="rotate(25 40 150)"')}${E(200,150,7,22,p.soft,'transform="rotate(-25 200 150)"')}`; }
+function o2(p){ return p.fat; }
+TPL["abd-upper"] = { name:"腹部 横断（肝・脾レベル）", draw:(p,o={}) => ({
+  under:`
+    ${abdShell(p)}
+    ${E(100,52,16,4,p.soft)}${E(140,52,16,4,p.soft)}
+    ${Pa(LIVER_UP,p.organ)}
+    <g stroke="${p.vessel}" fill="none" stroke-linecap="round" opacity="0.45">${St("M106 150 Q90 120 70 90",p.vessel,3.2)}${St("M100 132 Q80 128 52 120",p.vessel,2.4)}${St("M110 140 Q118 110 126 82",p.vessel,2.4)}${St("M84 112 L72 116 M80 102 L66 98",p.vessel,1.4)}</g>
+    ${E(96,124,6,4,p.vessel,'opacity="0.8"')}
+    ${St("M116 60 L120 76",p.fat,2)}
+    ${E(166,102,28,22,p.fluid,`stroke="${p.soft}" stroke-width="2"`)}${Pa("M140 96 Q166 72 193 96 Z",p.air)}
+    ${E(194,142,13,22,p.organ)}
+    ${Ci(132,160,7,p.vessel)}${E(106,156,8,7,p.vessel)}
+    ${Ci(120,182,14,p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}
+    ${St("M110 192 L106 204 M130 192 L134 204",p.bone,5)}`,
+  over:"",
+  anat:[[60,120,6,96,"肝臓"],[118,68,6,30,"肝円索"],[104,158,6,172,"下大静脈"],[118,188,6,214,"椎体"],
+        [120,52,234,24,"腹直筋"],[170,108,234,72,"胃"],[196,144,234,126,"脾臓"],[134,160,234,176,"大動脈"]]
+})};
+
+/* ---------- 腹部：腎・膵レベル ---------- */
+const KID = (cx,rot,p) => `<g transform="rotate(${rot} ${cx} 154)">${E(cx,154,17,24,p.organ)}${E(cx+(rot<0?8:-8),154,6,10,p.fat)}${E(cx+(rot<0?10:-10),152,3,5,p.fluid)}</g>`;
+TPL["abd-kidney"] = { name:"腹部 横断（腎・膵レベル）", draw:(p,o={}) => ({
+  under:`
+    ${abdShell(p)}
+    ${E(100,52,16,4,p.soft)}${E(140,52,16,4,p.soft)}
+    ${Pa("M28 120 Q30 80 70 72 Q92 74 96 96 Q84 120 66 128 Q40 140 28 120Z",p.organ)}
+    ${E(88,94,10,13,p.fluid)}
+    ${Ci(100,122,8,p.fluid,`stroke="${p.soft}" stroke-width="2"`)}
+    ${Pa("M104 112 Q130 100 160 96 Q178 94 186 104 Q176 110 158 108 Q132 112 112 124Z",p.organ)}
+    ${Ci(107,116,2.4,p.fluid)}
+    ${St("M126 112 Q150 104 178 104",p.vessel,3)}
+    ${Ci(118,124,4.5,p.vessel)}${Ci(130,124,3.5,p.vessel)}
+    ${Ci(130,150,8,p.vessel)}${E(108,148,9,7,p.vessel)}
+    ${KID(64,-25,p)}${KID(176,25,p)}
+    ${E(100,174,9,8,p.soft)}${E(140,174,9,8,p.soft)}
+    ${Ci(200,118,10,p.air,`stroke="${p.soft}" stroke-width="2"`)}
+    ${Ci(170,132,8,p.fluid,`stroke="${p.soft}" stroke-width="2"`)}
+    ${Ci(120,184,14,p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}`,
+  over:"",
+  anat:[[50,100,6,70,"肝臓"],[86,92,6,40,"胆嚢"],[96,124,6,118,"十二指腸"],[60,160,6,170,"右腎"],[104,148,6,206,"下大静脈"],
+        [150,102,234,70,"膵臓"],[130,124,234,40,"上腸間膜動脈"],[180,160,234,170,"左腎"],[132,152,234,140,"大動脈"],[142,176,234,206,"腸腰筋"]]
+})};
+
+/* ---------- 腹部：臍レベル ---------- */
+const SB_MID = [[70,90],[96,76],[150,74],[176,100],[84,120],[158,124],[126,96]];
+TPL["abd-mid"] = { name:"腹部 横断（臍レベル）", draw:(p,o={}) => ({
+  under:`
+    ${abdShell(p)}
+    ${E(98,52,16,4,p.soft)}${E(142,52,16,4,p.soft)}
+    ${SB_MID.map(([x,y])=>Ci(x,y,9,p.fluid,`stroke="${p.soft}" stroke-width="2.2"`)).join("")}
+    ${Ci(42,130,14,p.air,`stroke="${p.soft}" stroke-width="2"`)}${Pa("M29 134 L55 134 Q54 144 42 144 Q30 144 29 134Z",p.fluid)}
+    ${Ci(200,134,10,p.air,`stroke="${p.soft}" stroke-width="2"`)}
+    ${Ci(124,132,2.5,p.vessel)}${Ci(114,132,3,p.vessel)}
+    ${Ci(132,160,7,p.vessel)}${Ci(106,160,8,p.vessel)}
+    ${E(92,176,10,9,p.soft)}${E(148,176,10,9,p.soft)}
+    ${Ci(120,184,14,p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}
+    ${St("M110 194 L106 206 M130 194 L134 206",p.bone,5)}`,
+  over:"",
+  anat:[[36,126,6,96,"上行結腸"],[70,90,6,56,"小腸"],[104,160,6,200,"下大静脈"],[90,180,6,222,"腸腰筋"],
+        [98,52,234,24,"腹直筋"],[119,132,234,116,"腸間膜血管"],[204,134,234,150,"下行結腸"],[134,160,234,186,"大動脈"]]
+})};
+
+/* ---------- 下腹部：回盲部レベル ---------- */
+const ILIAC = "M26 150 Q30 110 56 100 Q66 120 60 150 Q50 170 30 172Z";
+TPL["abd-low"] = { name:"下腹部 横断（回盲部・腸骨レベル）", draw:(p,o={}) => ({
+  under:`
+    ${E(120,126,108,82,p.fat)}${E(120,128,97,71,p.fat,`stroke="${p.soft}" stroke-width="5"`)}
+    ${E(100,54,16,4,p.soft)}${E(140,54,16,4,p.soft)}
+    ${Pa(ILIAC,p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}${Pa(mirrorX(ILIAC),p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}
+    ${E(70,140,9,18,p.soft)}${E(170,140,9,18,p.soft)}
+    ${E(88,154,9,10,p.soft)}${E(152,154,9,10,p.soft)}
+    ${E(98,202,14,7,p.soft)}${E(142,202,14,7,p.soft)}
+    ${E(120,188,22,12,p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}
+    ${Ci(98,128,4,p.vessel)}${Ci(106,134,5,p.vessel)}${Ci(142,128,4,p.vessel)}${Ci(134,134,5,p.vessel)}
+    ${Ci(60,104,17,p.air,`stroke="${p.soft}" stroke-width="2.2"`)}${Pa("M44 110 L76 110 Q74 121 60 121 Q46 121 44 110Z",p.fluid)}
+    ${Ci(88,106,7,p.fluid,`stroke="${p.soft}" stroke-width="2"`)}
+    <g transform="rotate(-25 78 132)">${E(78,132,3.2,10,p.air,`stroke="${p.soft}" stroke-width="1.6"`)}</g>
+    ${Ci(168,112,13,p.air,`stroke="${p.soft}" stroke-width="2"`)}
+    ${Ci(120,88,9,p.fluid,`stroke="${p.soft}" stroke-width="2"`)}${Ci(144,74,9,p.fluid,`stroke="${p.soft}" stroke-width="2"`)}${Ci(98,74,9,p.fluid,`stroke="${p.soft}" stroke-width="2"`)}`,
+  over:"",
+  anat:[[50,96,6,56,"盲腸"],[86,104,6,90,"回腸末端"],[76,138,6,130,"虫垂"],[40,150,6,170,"腸骨"],[90,160,6,206,"腸腰筋"],
+        [176,106,234,74,"S状結腸"],[140,130,234,120,"外腸骨動静脈"],[120,190,234,210,"仙骨"]]
+})};
+
+/* ---------- 骨盤：寛骨臼レベル（女性） ---------- */
+const ACET = "M48 118 Q78 108 88 140 Q84 166 58 166";
+TPL["pelvis"] = { name:"骨盤 横断（寛骨臼レベル）", draw:(p,o={}) => ({
+  under:`
+    ${E(120,128,106,80,p.fat)}
+    ${E(66,186,34,16,p.soft)}${E(174,186,34,16,p.soft)}
+    ${E(90,110,10,7,p.soft)}${E(150,110,10,7,p.soft)}
+    ${E(96,150,6,16,p.soft)}${E(144,150,6,16,p.soft)}
+    ${Ci(64,140,20,p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}${Ci(176,140,20,p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}
+    ${St(ACET,p.bone,5)}${St(mirrorX(ACET),p.bone,5)}
+    ${Ci(86,94,4,p.vessel)}${Ci(96,96,5,p.vessel)}${Ci(154,94,4,p.vessel)}${Ci(144,96,5,p.vessel)}
+    ${E(120,104,28,20,p.fluid,`stroke="${p.soft}" stroke-width="1.5"`)}
+    ${E(120,136,16,10,p.organ)}
+    ${E(100,132,6,5,p.organ)}${E(140,132,6,5,p.organ)}
+    ${Ci(120,162,10,p.air,`stroke="${p.soft}" stroke-width="2.5"`)}
+    ${E(120,194,6,5,p.marrow,`stroke="${p.bone}" stroke-width="1.5"`)}`,
+  over:"",
+  anat:[[56,140,6,140,"大腿骨頭"],[80,116,6,100,"寛骨臼"],[86,94,6,64,"大腿動静脈"],[64,190,6,214,"大殿筋"],[98,152,6,174,"内閉鎖筋"],
+        [130,104,234,60,"膀胱"],[150,110,234,94,"恥骨筋"],[124,136,234,128,"子宮"],[140,132,234,156,"卵巣"],[126,164,234,190,"直腸"]]
+})};
+
+/* ---------- 骨盤・股関節：冠状断 ---------- */
+const ILC = "M40 30 Q70 14 100 40 Q104 70 92 92 L64 96 Q44 70 40 30Z";
+const NECK = "M76 120 L88 126 L66 150 L54 140Z";
+TPL["hip-cor"] = { name:"骨盤・股関節 冠状断", draw:(p,o={}) => {
+  const both = f => f("")+f("m");
+  return {
+  under:`
+    <rect width="240" height="240" fill="${p.fat}"/>
+    <rect x="22" y="146" width="70" height="94" fill="${p.soft}"/><rect x="148" y="146" width="70" height="94" fill="${p.soft}"/>
+    ${E(54,70,22,34,p.soft)}${E(186,70,22,34,p.soft)}
+    ${Pa(ILC,p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}${Pa(mirrorX(ILC),p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}
+    ${Pa("M100 30 L140 30 L134 80 L106 80Z",p.marrow,`stroke="${p.bone}" stroke-width="2.5"`)}
+    ${E(120,124,15,16,p.fluid)}
+    ${St("M96 124 Q110 140 117 150",p.bone,6)}${St("M144 124 Q130 140 123 150",p.bone,6)}
+    ${St("M64 98 Q82 84 100 98",p.bone,4)}${St("M176 98 Q158 84 140 98",p.bone,4)}
+    <rect x="44" y="150" width="24" height="90" fill="${p.marrow}" stroke="${p.bone}" stroke-width="2.5"/>
+    <rect x="172" y="150" width="24" height="90" fill="${p.marrow}" stroke="${p.bone}" stroke-width="2.5"/>
+    ${Pa(NECK,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}${Pa(mirrorX(NECK),p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    ${E(48,140,10,12,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}${E(192,140,10,12,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    ${E(72,162,5,6,p.marrow,`stroke="${p.bone}" stroke-width="1.5"`)}${E(168,162,5,6,p.marrow,`stroke="${p.bone}" stroke-width="1.5"`)}
+    ${Ci(82,110,16,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}${Ci(158,110,16,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}`,
+  over:"",
+  anat:[[60,40,6,20,"腸骨"],[82,92,6,72,"寛骨臼（臼蓋）"],[82,110,6,106,"大腿骨頭"],[68,136,6,134,"大腿骨頸部"],[42,140,6,166,"大転子"],[72,164,6,196,"小転子"],
+        [120,50,234,30,"仙骨"],[120,124,234,104,"膀胱"],[120,150,234,160,"恥骨結合"]]
+};}};
+
+/* ---------- 膝：矢状断 ---------- */
+TPL["knee-sag"] = { name:"膝 矢状断（左が前方）", draw:(p,o={}) => ({
+  under:`
+    <rect width="240" height="240" fill="${p.fat}"/>
+    ${Pa("M158 0 L240 0 L240 240 L160 240 Q166 170 166 130Z",p.soft)}
+    ${St("M184 0 Q178 120 176 240",p.vessel,5)}
+    ${St("M86 0 L72 78",p.lig,6)}
+    ${St("M86 34 Q98 58 92 78",p.fluid,3)}
+    ${Pa("M104 0 L148 0 L150 76 Q166 92 160 116 Q150 138 124 138 Q100 136 94 114 Q92 96 104 80Z",p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    ${St("M96 116 Q104 136 124 138 Q150 138 160 118",p.cart,3)}
+    ${Pa("M90 146 L168 146 Q170 152 164 160 L156 240 L104 240 L96 178 Q86 166 90 146Z",p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    ${St("M92 145 L166 145",p.cart,3)}
+    <g transform="rotate(-8 70 98)">${E(70,98,11,22,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}</g>
+    ${St("M80 84 Q84 98 80 112",p.cart,2.5)}
+    ${St("M70 120 L96 178",p.lig,5)}
+    ${St("M142 104 L110 145",p.lig,5)}
+    ${St("M150 156 Q160 120 116 106",p.lig,6)}
+    ${Pa("M150 140 L170 144 L166 150 L150 148Z",p.lig)}${Pa("M92 142 L106 144 L104 148 L94 148Z",p.lig)}`,
+  over:"",
+  anat:[[78,30,6,20,"大腿四頭筋腱"],[66,96,6,80,"膝蓋骨"],[84,150,6,140,"膝蓋腱"],[92,134,6,110,"膝蓋下脂肪体"],[120,200,6,210,"脛骨"],
+        [126,40,234,20,"大腿骨"],[126,126,234,78,"前十字靱帯"],[156,132,234,108,"後十字靱帯"],[162,146,234,150,"半月板（後角）"],[178,190,234,196,"膝窩動脈"]]
+})};
+
+/* ---------- 肩：斜冠状断 ---------- */
+TPL["shoulder-cor"] = { name:"肩 斜冠状断（右肩、右が外側）", draw:(p,o={}) => ({
+  under:`
+    <rect width="240" height="240" fill="${p.fat}"/>
+    ${Pa("M150 40 Q226 60 218 200 L198 200 Q204 86 150 60Z",p.soft)}
+    <g transform="rotate(8 70 86)">${E(70,86,46,14,p.soft)}</g>
+    ${E(78,58,32,8,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    ${Pa("M118 68 L204 72 L204 84 L122 82Z",p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    ${St("M124 90 L196 92",p.fat,2)}
+    ${Pa("M150 166 L186 166 L186 240 L150 240Z",p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    ${Ci(150,150,36,p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    ${E(180,124,8,6,p.marrow)}
+    ${St("M116 132 Q114 150 116 168",p.cart,3)}
+    ${Pa("M106 120 Q112 150 106 180 L92 180 L92 120Z",p.marrow,`stroke="${p.bone}" stroke-width="2"`)}
+    ${Pa("M106 118 L116 124 L106 128Z",p.lig)}${Pa("M106 172 L116 176 L106 182Z",p.lig)}
+    ${St("M108 98 Q150 96 182 120",p.lig,6)}`,
+  over:"",
+  anat:[[60,56,6,24,"鎖骨"],[60,88,6,72,"棘上筋"],[98,150,6,150,"関節窩"],[110,124,6,116,"関節唇"],
+        [160,70,234,40,"肩峰"],[150,100,234,76,"棘上筋腱"],[184,124,234,116,"大結節"],[146,160,234,166,"上腕骨頭"],[210,170,234,210,"三角筋"]]
+})};
+
+/* ---------- 描画 ---------- */
+function fillKeys(s, p){ return (s||"").replace(/\{(\w+)\}/g, (m,k) => p[k] || m); }
+function annSvg(a, cls){
+  if (typeof a === "string") return `<g class="${cls}"><path class="ol" stroke-dasharray="3 2" d="${a}"/></g>`;
+  const [x,y,tx,ty,t] = a;
+  /* ラベルは常に画像の内側へ向かって伸ばす（右半分は右寄せ、左半分は左寄せ） */
+  const anc = tx > 120 ? "end" : (tx < 120 ? "start" : "middle");
+  return `<g class="${cls}"><circle class="dot" cx="${x}" cy="${y}" r="2.4"/><line x1="${x}" y1="${y}" x2="${tx}" y2="${ty}"/><text x="${tx}" y="${ty-3}" text-anchor="${anc}">${t}</text></g>`;
+}
+/* view: {tpl, m, les, ann, o}  opts: {hl: 解剖クイズで強調する index} */
+function renderView(view, opts={}){
+  const p = {...PAL[view.m] };
+  const t = TPL[view.tpl].draw(p, view.o||{});
+  const anat = opts.hl != null
+    ? `<g class="quizmark"><circle cx="${t.anat[opts.hl][0]}" cy="${t.anat[opts.hl][1]}" r="7"/><circle cx="${t.anat[opts.hl][0]}" cy="${t.anat[opts.hl][1]}" r="2"/></g>`
+    : t.anat.map(a => annSvg(a,"anat")).join("");
+  const id = ++CLIP, mr = !view.m.startsWith("CT"), amp = mr ? 0.10 : 0.13;
+  const defs = `<defs><filter id="fx${id}" x="0" y="0" width="240" height="240" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="${mr?0.75:0.55}" result="b"/>
+    <feTurbulence type="fractalNoise" baseFrequency="${mr?0.7:0.95}" numOctaves="2" seed="${id%89}" result="t"/>
+    <feColorMatrix in="t" type="matrix" values="0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 1" result="g"/>
+    <feComposite in="b" in2="g" operator="arithmetic" k1="0" k2="1" k3="${amp}" k4="${-amp/2}"/></filter>
+    <radialGradient id="vg${id}" cx="50%" cy="50%" r="60%"><stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="${mr?0.5:0}"/></radialGradient></defs>`;
+  const body = `<rect width="240" height="240" fill="#000"/>${t.under}${fillKeys(typeof view.les==="function"?view.les(p):view.les,p)}${t.over}`;
+  return `<svg class="scan" viewBox="0 0 240 240" role="img" aria-label="${TPL[view.tpl].name}の模式図">${defs}<g filter="url(#fx${id})">${body}</g>${mr?`<rect width="240" height="240" fill="url(#vg${id})"/>`:""}${anat}${(view.ann||[]).map(a=>annSvg(a,"ann")).join("")}</svg>`;
+}
+function anatOf(tplName){ return TPL[tplName].draw(PAL.CT,{}).anat; }
+
+</script>
+<script>/* data-core.js */
+/* 症例データ共通 */
+const CASES = [];
+const C = c => CASES.push(c);
+const W = {
+  brain:"WL 40 / WW 80前後（脳条件）", stroke:"WL 35 / WW 35前後（脳梗塞用の狭いウィンドウ）", sub:"WL 70前後 / WW 150〜250（硬膜下ウィンドウの目安）",
+  bone:"WL 500 / WW 2000前後（骨条件）", med:"WL 40 / WW 350〜400（縦隔・軟部条件）", lung:"WL -600 / WW 1500前後（肺野条件）",
+  abd:"WL 40 / WW 350前後（腹部条件）", pa:"WL 100 / WW 600〜700（肺動脈の目安）", mri:"MRI（模式）"
+};
+const REGIONS = ["頭部","頭頸部","脊椎","胸部","腹部・骨盤","骨・関節","アーチファクト"];
+const SEV = {crit:"超緊急", urg:"緊急", rout:"待機的"};
+
+/* 症状の語彙（症状検索で使う） */
+const SYMPTOM_GROUPS = [
+  ["頭・神経", ["頭痛","意識障害","片麻痺・脱力","言語障害","しびれ","けいれん","めまい・ふらつき","視覚異常・複視","異常行動・記憶障害","頭部外傷"]],
+  ["顔・頸部", ["顔面痛・鼻閉","眼周囲の腫れ","咽頭痛","嚥下困難・流涎","開口障害","頸部痛"]],
+  ["胸", ["胸痛","背部痛","呼吸困難","咳・痰","喀血","失神","胸部外傷"]],
+  ["腹・骨盤", ["腹痛（上腹部）","腹痛（右上腹部）","腹痛（右下腹部）","腹痛（左下腹部）","腹痛（下腹部）","腹痛（腹部全体）","側腹部痛","腹部膨満","嘔吐・嘔気","下痢","血便・下血","黄疸","血尿","腹部外傷","鼠径部・大腿内側の痛み","不正性器出血・月経異常"]],
+  ["背中・腰・四肢", ["腰痛","下肢のしびれ・痛み","歩行障害","排尿・排便障害","四肢麻痺","転倒","股関節痛","膝の痛み・腫れ","肩の痛み","高エネルギー外傷"]],
+  ["全身・背景", ["発熱","ショック・血圧低下","体重減少","無症状（偶然発見）","妊娠の可能性","皮膚の発赤・腫脹","高血圧","免疫低下・糖尿病","抗凝固薬の内服","高齢者"]]
+];
+
+</script>
+<script>/* data-head.js */
+/* 頭部・頭頸部 */
+const MCA = "M150 70 Q205 95 200 160 Q172 176 148 150 Q140 112 150 70Z";
+const SDH_RING = [[120,120,84,98],[110,120,76,98]];
+const FHR = "M113 80 Q99 90 102 108 L112 107 Q109 93 117 82Z", PHR = "M110 142 Q100 152 98 170 L105 170 Q107 156 115 146Z";
+
+C({id:"stroke", name:"急性期脳梗塞（中大脳動脈領域）", reg:"頭部", sev:"crit", alias:"脳塞栓 アテローム血栓性 MCA 脳卒中 rt-PA 血栓回収",
+  keys:["片麻痺・脱力","言語障害","意識障害","視覚異常・複視","しびれ","高血圧","高齢者"],
+  v:[{tpl:"head-vent",m:"CT",wl:W.stroke,cap:"左中大脳動脈領域の淡い低吸収と、島皮質の不明瞭化（early CT sign）。実際の画像ではごくわずかな差です。",
+      les:`<path d="${MCA}" fill="#6e6e6e"/>`, ann:[MCA,[176,110,214,40,"淡い低吸収"],[172,122,160,226,"島皮質の不明瞭化"]]},
+     {tpl:"head-vent",m:"DWI",wl:"DWI（b=1000）",cap:"同じ領域が拡散強調像で明瞭な高信号。ADC 値の低下を伴えば急性期の梗塞を示唆します。",
+      les:`<path d="${MCA}" fill="#f1f1f1"/>`, ann:[[176,110,214,40,"DWI 高信号"]]}],
+  sx:["突然の片麻痺、顔面麻痺、構音障害・失語","共同偏視、半側空間無視（大きな梗塞で）","発症時刻（最終健常確認時刻）が治療方針を左右する"],
+  ct:["発症早期は正常に見えることが多い","early CT sign：レンズ核・島皮質の不明瞭化、皮髄境界の消失、脳溝の狭小化","hyperdense MCA sign（閉塞血管内の血栓が線状の高吸収）","ASPECTS で中大脳動脈領域の範囲を点数化"],
+  mri:["DWI：発症早期（数十分〜数時間）から高信号、ADC 低下","FLAIR：発症数時間までは変化が乏しい（DWI-FLAIR ミスマッチは発症早期を示唆）","MRA：主幹動脈の閉塞・途絶の確認","T2*/SWI：出血の除外、血管内血栓（susceptibility vessel sign）"],
+  tech:["時間が最優先：施設の脳卒中プロトコルに沿って短時間で撮り切る","MRI 前に禁忌（ペースメーカー・体内金属など）の確認を迅速かつ確実に","CT では狭いウィンドウで early CT sign を見やすくする","血栓回収療法を考慮する場合は CTA/MRA・灌流画像の追加有無を医師に確認"],
+  rep:["hyperdense MCA sign や広範な early CT sign","DWI 高信号＋MRA での主幹動脈閉塞","出血の合併（出血の有無で治療が大きく変わる）"],
+  ddx:["脳出血（CT で除外）","てんかん発作後の麻痺（Todd 麻痺）","低血糖","脳腫瘍"],
+  techQ:{q:"発症2時間の脳梗塞疑いで MRI を撮像する。撮像前に最優先で確認すべきことは？",opts:["ペースメーカーや体内金属など MRI 禁忌の有無","前回の頭部 MRI の撮影日","T1 強調像から順にフルプロトコルで撮る準備","造影 MRI を追加するかどうか"],a:0,
+    exp:"急いでいても安全確認は省略できません。禁忌確認を短時間・確実に行い、DWI・FLAIR・MRA・T2* などの必要最小限の撮像を優先します。"},
+  repQ:{q:"頭部単純CTを撮影した直後、片側の中大脳動脈に沿った線状の高吸収に気づいた。最も適切な対応は？",opts:["hyperdense MCA sign の可能性として、すぐ担当医に伝える","血管壁の石灰化と判断し、特に伝えない","読影レポートが出るまで待つ","患者さんに脳梗塞の可能性を説明する"],a:0,
+    exp:"主幹動脈閉塞を示唆する所見で、血栓回収療法の判断につながります。診断は医師が行いますが、気づいた所見をすぐ共有することが時間短縮になります。"}
+});
+
+C({id:"lacunar", name:"ラクナ梗塞", reg:"頭部", sev:"urg", alias:"穿通枝梗塞 小梗塞 BAD",
+  keys:["片麻痺・脱力","しびれ","言語障害","高血圧","高齢者"],
+  v:[{tpl:"head-vent",m:"DWI",wl:"DWI（b=1000）",cap:"左内包後脚付近の小さな高信号。15mm 未満の穿通枝領域の梗塞です。",
+      les:`<ellipse cx="148" cy="118" rx="4" ry="5" fill="#f0f0f0"/>`, ann:[[148,118,214,60,"小さなDWI高信号"]]},
+     {tpl:"head-vent",m:"FLAIR",wl:"FLAIR",cap:"FLAIR では古いラクナ（中心が低信号）や大脳白質病変も同時に見られることが多い。新旧の区別は DWI で行います。",
+      les:`<ellipse cx="148" cy="118" rx="4" ry="5" fill="#cfcfcf"/><ellipse cx="94" cy="112" rx="3" ry="4" fill="#1e1e1e" stroke="#bdbdbd" stroke-width="1.2"/><ellipse cx="100" cy="80" rx="6" ry="4" fill="#b0b0b0"/><ellipse cx="140" cy="80" rx="6" ry="4" fill="#b0b0b0"/>`,
+      ann:[[148,118,214,60,"新しい梗塞"],[94,112,20,40,"古いラクナ"],[100,80,40,214,"白質病変"]]}],
+  sx:["純粋運動性片麻痺、純粋感覚障害、構音障害-手不器用症候群など","意識障害は伴いにくい","高血圧・糖尿病などの危険因子"],
+  ct:["急性期は描出されにくい","慢性期は境界明瞭な小さな低吸収"],
+  mri:["DWI で小さな高信号（15mm 未満）","FLAIR で新旧の病変が混在しやすい。新規病変の判定は DWI","分枝粥腫型（BAD）は進行性に悪化することがある"],
+  tech:["DWI は薄めのスライスや冠状断を追加すると小病変が見つけやすい（施設方針で）","動きで小病変が見えなくなるので頭部の固定を丁寧に"],
+  rep:["症状に合う部位の DWI 高信号","出血の合併"],
+  ddx:["血管周囲腔の拡大（DWI で高信号にならない）","多発性硬化症","小出血"]
+});
+
+C({id:"ich", name:"高血圧性脳出血（被殻出血）", reg:"頭部", sev:"crit", alias:"脳内出血 ICH 被殻",
+  keys:["頭痛","片麻痺・脱力","意識障害","嘔吐・嘔気","言語障害","高血圧","抗凝固薬の内服"],
+  v:[{tpl:"head-vent",m:"CT",wl:W.brain,o:{shift:3},cap:"右被殻の楕円形の高吸収（血腫）と、周囲の低吸収（浮腫）。側脳室がわずかに圧排されています。",
+      les:`<ellipse cx="84" cy="118" rx="17" ry="24" fill="#636363"/><ellipse cx="84" cy="118" rx="12" ry="18" fill="{blood}"/>`,
+      ann:[[84,110,6,40,"血腫（高吸収）"],[74,134,6,200,"周囲の浮腫"]]}],
+  sx:["突然の頭痛、嘔吐、片麻痺、意識障害","高血圧の既往、抗凝固薬・抗血小板薬の内服"],
+  ct:["急性期の血腫は高吸収（CT 値 およそ 60〜80 HU）","好発部位：被殻 > 視床 > 皮質下 > 小脳 > 橋","脳室穿破、正中偏位、水頭症の有無","CTA で血腫内の造影剤漏出（spot sign）は血腫拡大の予測因子"],
+  mri:["発症からの時間で信号が変化する（T2*/SWI で低信号）","CT が第一選択で、MRI は原因検索（腫瘍・血管奇形など）で使われる"],
+  tech:["抗凝固薬内服の有無は医師への情報として重要","血腫の大きさ・脳室穿破・水頭症は治療方針に直結する","CTA を撮る場合は spot sign の有無に注目","嘔吐・意識低下があるため撮影中の気道と体位に注意"],
+  rep:["大量の脳室穿破、急性水頭症、大きな正中偏位","撮影中の意識レベル低下・嘔吐"],
+  ddx:["出血性梗塞","腫瘍内出血","脳動静脈奇形からの出血","外傷性脳内出血"],
+  techQ:{q:"脳出血患者の CTA で、血腫内に点状の造影剤漏出（spot sign）を認めた。この所見の意味は？",opts:["血腫が今後拡大するリスクが高い","出血がすでに止まっている","撮影のアーチファクトなので評価不要","慢性期の血腫を示す"],a:0,
+    exp:"spot sign は活動性出血を反映し、血腫拡大や予後不良の予測因子とされます。気づいたら医師に共有しましょう。"}
+});
+
+C({id:"thalamic", name:"視床出血", reg:"頭部", sev:"crit", alias:"脳内出血 脳室穿破",
+  keys:["しびれ","片麻痺・脱力","意識障害","頭痛","嘔吐・嘔気","高血圧"],
+  v:[{tpl:"head-vent",m:"CT",wl:W.brain,cap:"右視床の高吸収（血腫）と、側脳室後角への血液の流入（脳室穿破）。",
+      les:`<ellipse cx="108" cy="128" rx="13" ry="15" fill="#666"/><ellipse cx="108" cy="128" rx="9" ry="11" fill="{blood}"/><path d="${PHR}" fill="{blood}"/><rect x="118.5" y="112" width="3" height="24" fill="{blood}"/>`,
+      ann:[[106,126,6,120,"視床の血腫"],[104,160,6,200,"脳室穿破"],[120,124,234,124,"第3脳室内の血液"]]}],
+  sx:["半身の感覚障害が目立つ（しびれ）","片麻痺、意識障害、眼球の下方偏位"],
+  ct:["視床の高吸収","脳室穿破しやすく、急性水頭症を起こしうる"],
+  mri:["CT が第一選択"],
+  tech:["脳室穿破・第3脳室の閉塞による水頭症に注意して脳室の大きさを確認","脳室内の液面形成（血液）を見逃さない"],
+  rep:["脳室穿破、脳室拡大（急性水頭症）"],
+  ddx:["被殻出血","視床梗塞","腫瘍内出血"]
+});
+
+C({id:"cerebellar-h", name:"小脳出血", reg:"頭部", sev:"crit", alias:"後頭蓋窩 出血",
+  keys:["めまい・ふらつき","嘔吐・嘔気","頭痛","歩行障害","意識障害","高血圧"],
+  v:[{tpl:"head-post",m:"CT",wl:W.brain,cap:"右小脳半球の高吸収と、第4脳室の圧排。後頭蓋窩は狭く、短時間で脳幹圧迫・水頭症に進みます。",
+      les:`<ellipse cx="88" cy="176" rx="20" ry="18" fill="#666"/><ellipse cx="88" cy="176" rx="15" ry="13" fill="{blood}"/><path d="M114 146 L124 146 L118 156Z" fill="{wm}"/>`,
+      ann:[[88,176,6,214,"小脳の血腫"],[118,150,234,150,"圧排された第4脳室"]]}],
+  sx:["突然のめまい、繰り返す嘔吐、後頭部痛","立てない・歩けない（体幹失調）","意識障害は急に進むことがある"],
+  ct:["小脳半球の高吸収","第4脳室の圧排、閉塞性水頭症","脳幹の圧迫"],
+  mri:["CT が第一選択"],
+  tech:["後頭蓋窩はビームハードニングで見えにくい：薄いスライスや再構成で確認","めまいで頭が動きやすいので固定と声かけ"],
+  rep:["径3cm を超える血腫、第4脳室の圧排、水頭症（手術を検討することがある）"],
+  ddx:["小脳梗塞","腫瘍内出血","ビームハードニングアーチファクト"],
+  repQ:{q:"頭部CTで小脳に径3cmを超える出血があり、第4脳室が圧排されている。最も適切な対応は？",opts:["水頭症や脳幹圧迫のリスクがあるため、直ちに医師へ伝える","容量が小さいので経過観察でよいと判断する","患者を待合室に戻して結果を待つ","MRI を追加で撮像してから伝える"],a:0,
+    exp:"小脳出血は急速に悪化しうる部位で、手術適応の判断に関わります。気づいた時点で連絡を。"}
+});
+
+C({id:"pontine-h", name:"橋出血", reg:"頭部", sev:"crit", alias:"脳幹出血",
+  keys:["意識障害","四肢麻痺","高血圧","呼吸困難"],
+  v:[{tpl:"head-post",m:"CT",wl:W.brain,cap:"橋中央の高吸収（血腫）。重症例では両側に広がり、急速に昏睡に至ります。",
+      les:`<ellipse cx="120" cy="128" rx="14" ry="11" fill="{blood}"/>`, ann:[[120,128,234,96,"橋の血腫"]]}],
+  sx:["急激な意識障害、四肢麻痺","縮瞳（針先瞳孔）、高熱、呼吸異常"],
+  ct:["橋の高吸収","第4脳室への穿破"],
+  mri:["CT が第一選択"],
+  tech:["呼吸状態が不安定なことが多い：気道・モニターに注意して安全に撮る","後頭蓋窩のアーチファクトに注意"],
+  rep:["橋出血そのもの（重症度が高い）"],
+  ddx:["ビームハードニングによる偽病変","脳底動脈閉塞（梗塞）"]
+});
+
+C({id:"sah", name:"くも膜下出血", reg:"頭部", sev:"crit", alias:"SAH 脳動脈瘤破裂",
+  keys:["頭痛","嘔吐・嘔気","意識障害","失神","けいれん","高血圧"],
+  v:[{tpl:"head-base",m:"CT",wl:W.brain,cap:"脳底槽（鞍上槽・迂回槽）とシルビウス裂に沿った高吸収。いわゆるペンタゴンが白く見えます。",
+      les:p=>SAH_SHAPES(p.blood)+`<ellipse cx="120" cy="151" rx="15" ry="14" fill="${p.gm}"/>`,
+      ann:[[130,108,234,40,"鞍上槽の高吸収"],[168,99,234,70,"シルビウス裂"],[104,152,6,206,"迂回槽"]]},
+     {tpl:"head-base",m:"CT",label:"正常の脳底槽（比較）",wl:W.brain,cap:"正常例。脳底槽とシルビウス裂は脳脊髄液で低吸収（黒）に見えます。",les:"",ann:[]}],
+  sx:["突然の激しい頭痛（「今まで経験したことのない」頭痛）","嘔吐、意識障害、項部硬直","軽い頭痛のみの「警告出血」もある"],
+  ct:["脳底槽・シルビウス裂・大脳縦裂の高吸収","少量だと脚間槽、シルビウス裂、第4脳室、後角の液面形成のみのことがある","CT の感度は発症直後ほど高く、日数が経つと低下する","CTA で原因の脳動脈瘤を検索"],
+  mri:["FLAIR：脳溝・脳槽の高信号","T2*/SWI：低信号として描出","CT で不明瞭な亜急性期に有用"],
+  tech:["再出血の予防が最重要：痛み・刺激・急な体動を最小限に、手早く撮る","少量の出血は見逃しやすいので、脚間槽・シルビウス裂・後角を意識して見る","CTA の追加は医師と相談し、造影剤の準備を早めに"],
+  rep:["脳底槽の高吸収（典型的なSAH）","判断に迷う程度のわずかな高吸収（迷ったら伝える）","急性水頭症（脳室拡大）"],
+  ddx:["偽性SAH（びまん性脳浮腫で脳槽が相対的に高吸収に見える）","髄膜炎","造影剤投与後の検査"],
+  techQ:{q:"くも膜下出血が疑われる患者の撮影で、技師として特に気をつけることは？",opts:["再出血を避けるため、刺激や急な体動を最小限にして手早く撮る","画質向上のため息止め練習を何度も繰り返す","全身を観察するため体位変換を多めに行う","結果待ちの間、検査室で一人にしておく"],a:0,
+    exp:"SAH は再出血で予後が大きく悪化します。痛み・血圧上昇を招く刺激を避け、安全かつ迅速に撮影します。"},
+  repQ:{q:"突然の頭痛で来院。単純CTで脳底槽にわずかな高吸収があるか判断に迷う。最も適切な対応は？",opts:["迷う所見であることも含めて医師に伝え、評価を仰ぐ","確信が持てないので伝えない","アーチファクトと判断して再撮影する","患者に問題ないと伝えて帰す"],a:0,
+    exp:"少量の SAH は見逃されやすい代表的な所見です。技師が判断しきる必要はなく、「迷った」ことを共有するのが大切です。"}
+});
+
+C({id:"asdh", name:"急性硬膜下血腫", reg:"頭部", sev:"crit", alias:"ASDH 外傷",
+  keys:["頭部外傷","意識障害","片麻痺・脱力","転倒","抗凝固薬の内服","高齢者"],
+  v:[{tpl:"head-vent",m:"CT",wl:W.sub,o:{shift:8},cap:"左大脳半球の表面に沿った三日月状の高吸収と、正中構造の右側への偏位。",
+      les:p=>ring(...SDH_RING,p.blood), ann:[[196,120,234,60,"三日月状の血腫"],[112,190,6,214,"正中偏位"]]}],
+  sx:["頭部外傷後の意識障害、頭痛、片麻痺","高齢者・抗凝固薬内服者では軽い転倒でも起こる"],
+  ct:["脳表に沿った三日月状の高吸収（縫合線を越えて広がる）","大脳鎌や小脳テントに沿う薄い血腫は見逃しやすい","正中偏位、脳溝の消失、脳ヘルニアの所見"],
+  mri:["急性期の評価は CT が基本"],
+  tech:["硬膜下ウィンドウ（通常より広い WW）で骨との境界を確認","冠状断の再構成で頭頂部・テント沿いの薄い血腫を探す","骨条件で骨折も確認","頸椎損傷の可能性も考えた体位管理"],
+  rep:["正中偏位を伴う血腫","撮影中の瞳孔不同・意識低下","抗凝固薬内服中の頭蓋内出血"],
+  ddx:["急性硬膜外血腫","慢性硬膜下血腫（低〜等吸収）","くも膜下出血"],
+  techQ:{q:"薄い急性硬膜下血腫を見つけやすくする工夫として適切なものは？",opts:["硬膜下ウィンドウ（広めの WW）と冠状断再構成で確認する","肺野条件で観察する","スライス厚を厚くして再構成する","必ず造影CTを追加する"],a:0,
+    exp:"骨に接する薄い血腫は脳条件では骨の白さに埋もれます。ウィンドウを広げ、冠状断で頭頂部やテント沿いを確認しましょう。"},
+  repQ:{q:"抗凝固薬内服中の高齢者が転倒。CTで脳表に沿う三日月状の高吸収と正中偏位を認めた。最も適切な対応は？",opts:["緊急性の高い所見として直ちに医師へ伝える","高齢者によくある変化なので伝えない","翌日の読影を待つ","MRI で確認してから伝える"],a:0,
+    exp:"正中偏位を伴う急性硬膜下血腫は手術や抗凝固薬の中和を急ぐ必要があります。"}
+});
+
+C({id:"edh", name:"急性硬膜外血腫", reg:"頭部", sev:"crit", alias:"EDH 中硬膜動脈 意識清明期",
+  keys:["頭部外傷","意識障害","頭痛","嘔吐・嘔気","高エネルギー外傷"],
+  v:[{tpl:"head-vent",m:"CT",wl:W.brain,o:{shift:5},cap:"左側頭部の凸レンズ型の高吸収。縫合線を越えず、骨折を伴うことが多い。",
+      les:`<path d="M200 82 Q166 120 200 160 Q214 120 200 82Z" fill="{blood}"/>`, ann:[[190,120,234,60,"凸レンズ型の血腫"]]},
+     {tpl:"head-vent",m:"CTB",wl:W.bone,cap:"骨条件で側頭骨の骨折線（黒い線）を確認。中硬膜動脈の損傷と関係します。",
+      les:`<path d="M201 104 L212 112" stroke="#000" stroke-width="2.4"/>`, ann:[[206,108,234,60,"骨折線"]]}],
+  sx:["頭部打撲後、いったん意識が戻る（意識清明期）あとに急速に悪化することがある","頭痛、嘔吐、瞳孔不同"],
+  ct:["凸レンズ型の高吸収（縫合線を越えない）","側頭骨骨折を伴いやすい（中硬膜動脈損傷）","血腫内の低吸収混在は活動性出血を示唆（swirl sign）"],
+  mri:["急性期の評価は CT が基本"],
+  tech:["骨条件・3D 再構成で骨折線を確認","意識清明でも急変しうるので撮影中も観察を続ける"],
+  rep:["凸レンズ型血腫、正中偏位","血腫内の低吸収混在（swirl sign）"],
+  ddx:["急性硬膜下血腫","静脈洞からの出血"]
+});
+
+C({id:"csdh", name:"慢性硬膜下血腫", reg:"頭部", sev:"urg", alias:"CSDH 認知症様",
+  keys:["歩行障害","異常行動・記憶障害","片麻痺・脱力","頭痛","転倒","高齢者","抗凝固薬の内服"],
+  v:[{tpl:"head-vent",m:"CT",wl:W.sub,o:{shift:6},cap:"左大脳半球表面の三日月状の低〜等吸収。数週間前の軽い頭部打撲が多く、本人は覚えていないこともあります。",
+      les:p=>ring(...SDH_RING,"#565656")+`<path d="M178 150 Q196 160 192 186 Q186 168 178 150Z" fill="#9a9a9a"/>`, ann:[[196,110,234,60,"三日月状の低吸収"],[188,170,234,200,"液面（新旧の血液）"]]}],
+  sx:["数週〜数か月前の軽い頭部打撲（覚えていないことも）","歩行障害、物忘れ、意欲低下、片麻痺","高齢者・飲酒・抗凝固薬内服"],
+  ct:["三日月状の低〜等吸収（時期により混在）","等吸収だと脳と区別しにくい → 脳溝の消失・正中偏位で気づく","両側性だと正中偏位が目立たない"],
+  mri:["T1・T2 とも高信号のことが多く、CT で等吸収でも描出しやすい"],
+  tech:["等吸収の血腫は見逃しやすい：脳溝が脳表まで届いているか確認","両側性を見逃さない"],
+  rep:["正中偏位を伴う血腫","等吸収で判断に迷う場合"],
+  ddx:["硬膜下水腫","脳萎縮","急性硬膜下血腫"]
+});
+
+C({id:"contusion", name:"脳挫傷", reg:"頭部", sev:"crit", alias:"外傷性脳内出血 contre-coup",
+  keys:["頭部外傷","意識障害","けいれん","転倒","高エネルギー外傷"],
+  v:[{tpl:"head-base",m:"CT",wl:W.brain,cap:"前頭葉底部と側頭葉先端に、点状の高吸収（出血）と周囲の低吸収（浮腫）が混在（salt and pepper）。",
+      les:`<ellipse cx="96" cy="56" rx="18" ry="11" fill="#666"/><ellipse cx="144" cy="56" rx="14" ry="9" fill="#666"/><ellipse cx="66" cy="124" rx="13" ry="16" fill="#666"/>${[[90,54],[98,58],[104,52],[142,56],[148,54],[64,120],[70,128]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="2.6" fill="#d8d8d8"/>`).join("")}`,
+      ann:[[96,56,6,24,"前頭葉底部の挫傷"],[144,56,234,24,"対側にも"],[66,124,6,170,"側頭葉の挫傷"]]}],
+  sx:["頭部外傷後の意識障害、けいれん","時間とともに出血・浮腫が増えて悪化することがある"],
+  ct:["前頭葉底部・側頭葉先端に好発（頭蓋底の凹凸に当たる）","打撃部の反対側にも生じる（contre-coup）","点状出血と浮腫の混在、経時的に拡大しうる"],
+  mri:["T2*/SWI で小出血を鋭敏に描出"],
+  tech:["前頭葉底部は骨のアーチファクトで見えにくい：冠状断で確認","経過観察 CT では前回と同じ条件・断面で比較できるように"],
+  rep:["挫傷の拡大、新たな出血、正中偏位"],
+  ddx:["ビームハードニング（前頭蓋底）","出血性梗塞"]
+});
+
+C({id:"dai", name:"びまん性軸索損傷", reg:"頭部", sev:"urg", alias:"DAI 剪断損傷",
+  keys:["頭部外傷","意識障害","高エネルギー外傷"],
+  v:[{tpl:"head-vent",m:"T2S",wl:"T2*強調像",cap:"皮髄境界と脳梁膨大部に、点状の低信号（微小出血）が多発。CT ではほとんど異常がないことが多い。",
+      les:`${[[70,70],[176,80],[60,140],[180,150],[96,186],[150,60]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="2.6" fill="#0a0a0a"/>`).join("")}<ellipse cx="120" cy="154" rx="8" ry="3" fill="#0a0a0a"/>`,
+      ann:[[70,70,6,40,"皮髄境界の微小出血"],[120,154,234,190,"脳梁膨大部"]]}],
+  sx:["交通事故など回転加速度のかかる外傷","受傷直後から意識障害が続くのに CT で説明できる所見が乏しい"],
+  ct:["正常〜わずかな点状出血のみのことが多い","脳梁・脳幹の小出血"],
+  mri:["T2*/SWI：皮髄境界・脳梁・脳幹の点状低信号","DWI：急性期の高信号","FLAIR：高信号"],
+  tech:["SWI/T2* を含めたプロトコルが有用","人工呼吸器・モニター類の MRI 対応を事前に確認"],
+  rep:["脳幹病変","CT で説明のつかない意識障害（MRI の検討につながる）"],
+  ddx:["多発性の海綿状血管腫","アミロイドアンギオパチーの微小出血（高齢者）"]
+});
+
+C({id:"skull-fx", name:"頭蓋骨骨折", reg:"頭部", sev:"urg", alias:"陥没骨折 線状骨折 気脳症",
+  keys:["頭部外傷","頭痛","転倒","高エネルギー外傷"],
+  v:[{tpl:"head-vent",m:"CTB",wl:W.bone,cap:"左前頭頭頂部の骨の連続性の途絶と陥没。頭蓋内に小さな空気（気脳症）があります。",
+      les:`<path d="M206 66 Q226 96 210 128 Q220 96 206 66Z" fill="#666"/><path d="M196 78 L204 92 L198 104" stroke="#000" stroke-width="2.6" fill="none"/><path d="M196 84 Q190 92 194 100" stroke="#f4f4f4" stroke-width="4" fill="none"/><circle cx="180" cy="80" r="2.4" fill="#000"/><circle cx="174" cy="86" r="1.8" fill="#000"/>`,
+      ann:[[200,92,234,40,"骨折・陥没"],[214,100,234,150,"皮下血腫"],[178,82,140,20,"気脳症（空気）"]]}],
+  sx:["頭部打撲部の腫脹・陥凹","髄液漏（鼻・耳から透明な液）、耳出血は頭蓋底骨折を示唆"],
+  ct:["骨条件で骨折線・陥没","縫合線や血管溝との区別","頭蓋内の空気（気脳症）は硬膜損傷や副鼻腔骨折を示唆"],
+  mri:["骨折自体の評価は CT"],
+  tech:["骨条件・薄いスライス・3D 再構成（VR）で骨折線を確認","頭蓋底骨折は軸位だけでは見えにくい：冠状断・矢状断も"],
+  rep:["陥没骨折、気脳症、骨折に伴う頭蓋内出血"],
+  ddx:["縫合線","血管溝","副縫合"]
+});
+
+C({id:"hydro", name:"急性水頭症", reg:"頭部", sev:"crit", alias:"閉塞性水頭症 脳室拡大 シャント不全",
+  keys:["頭痛","嘔吐・嘔気","意識障害","歩行障害","視覚異常・複視"],
+  v:[{tpl:"head-vent",m:"CT",wl:W.brain,cap:"側脳室の前角・後角と第3脳室が拡大し、周囲に淡い低吸収（脳室周囲への髄液のしみ出し）。脳溝は狭くなっています。",
+      les:`<path d="M113 74 Q86 86 90 112 L114 110 Q107 92 117 78Z" fill="{csf}" stroke="#6a6a6a" stroke-width="4"/><path d="M127 74 Q154 86 150 112 L126 110 Q133 92 123 78Z" fill="{csf}" stroke="#6a6a6a" stroke-width="4"/><rect x="116" y="110" width="8" height="28" fill="{csf}"/><path d="M110 138 Q92 152 92 174 L106 172 Q106 156 116 144Z" fill="{csf}"/><path d="M130 138 Q148 152 148 174 L134 172 Q134 156 124 144Z" fill="{csf}"/>`,
+      ann:[[100,94,6,40,"拡大した前角"],[120,124,234,124,"拡大した第3脳室"],[146,104,234,60,"脳室周囲の低吸収"]]}],
+  sx:["頭痛、嘔吐、意識障害（頭蓋内圧亢進）","シャント手術後の患者ではシャント不全を疑う"],
+  ct:["脳室拡大（特に側脳室下角・第3脳室の拡大）","脳室周囲の低吸収（髄液の脳室外へのしみ出し）","原因：出血、腫瘍、小脳病変による閉塞"],
+  mri:["閉塞部位の評価（中脳水道など）に矢状断が有用"],
+  tech:["以前の画像と同じ断面で比較できるようにする","シャントバルブの種類によっては MRI で設定が変わることがある：撮像後の確認を医師と共有"],
+  rep:["前回より明らかな脳室拡大","閉塞原因になりうる病変"],
+  ddx:["脳萎縮による脳室拡大（脳溝も開大）","正常圧水頭症"]
+});
+
+C({id:"gbm", name:"膠芽腫", reg:"頭部", sev:"urg", alias:"グリオブラストーマ GBM 脳腫瘍 神経膠腫",
+  keys:["頭痛","けいれん","片麻痺・脱力","異常行動・記憶障害","言語障害"],
+  v:[{tpl:"head-vent",m:"T1C",wl:"造影T1強調像",o:{shift:5},cap:"右前頭葉の不整なリング状造影効果を持つ腫瘤。中心は壊死で造影されません。",
+      les:`<path d="M60 70 Q80 52 102 64 Q112 86 98 102 Q76 112 62 98 Q52 84 60 70Z" fill="#3a3a3a" stroke="#e2e2e2" stroke-width="4.5"/>`,
+      ann:[[100,66,6,24,"不整なリング状造影"],[80,84,6,140,"中心壊死"]]},
+     {tpl:"head-vent",m:"FLAIR",wl:"FLAIR",o:{shift:5},cap:"腫瘤の周囲に広い高信号（浮腫と腫瘍浸潤）。",
+      les:`<path d="M48 64 Q80 36 118 60 Q126 96 108 118 Q76 134 52 112 Q38 90 48 64Z" fill="#c6c6c6"/><path d="M60 70 Q80 52 102 64 Q112 86 98 102 Q76 112 62 98 Q52 84 60 70Z" fill="#8a8a8a"/>`,
+      ann:[[110,100,234,40,"周囲の高信号（浮腫）"]]}],
+  sx:["数週〜数か月で進む頭痛、けいれん、麻痺、性格変化","中高年に多い"],
+  ct:["不整な低〜等吸収の腫瘤、周囲浮腫、正中偏位","造影でリング状の不整な増強"],
+  mri:["造影T1：厚く不整なリング状造影、中心壊死","FLAIR：広い周囲高信号","灌流画像で腫瘍血流の上昇"],
+  tech:["造影前後で同じ断面・条件を揃える","3D 造影T1 は手術ナビゲーションに使われることがある"],
+  rep:["正中偏位・脳ヘルニア所見","腫瘍内出血"],
+  ddx:["転移性脳腫瘍","脳膿瘍（DWI 高信号）","悪性リンパ腫"]
+});
+
+C({id:"brain-mets", name:"転移性脳腫瘍", reg:"頭部", sev:"urg", alias:"脳転移 肺癌 乳癌",
+  keys:["頭痛","けいれん","片麻痺・脱力","めまい・ふらつき","体重減少"],
+  v:[{tpl:"head-vent",m:"T1C",wl:"造影T1強調像",cap:"皮髄境界に多発する結節状・リング状の造影病変。",
+      les:`<circle cx="70" cy="80" r="7" fill="#555" stroke="#e2e2e2" stroke-width="3"/><circle cx="170" cy="150" r="9" fill="#555" stroke="#e2e2e2" stroke-width="3"/><circle cx="152" cy="58" r="4" fill="#e2e2e2"/><circle cx="96" cy="190" r="3.5" fill="#e2e2e2"/>`,
+      ann:[[70,80,6,40,"リング状造影"],[170,150,234,190,"多発病変"],[152,58,234,30,"小結節"]]}],
+  sx:["癌の既往（肺癌・乳癌・腎癌・消化器癌・悪性黒色腫など）","頭痛、けいれん、麻痺、ふらつき"],
+  ct:["皮髄境界に多発する結節、周囲浮腫が強い"],
+  mri:["造影T1 で多発する結節状・リング状造影","小病変の検出は造影 MRI が最も鋭敏（3D 撮像）"],
+  tech:["小さな病変の検出に薄いスライスの 3D 造影T1","造影剤投与後の撮像タイミングを施設プロトコルに合わせる"],
+  rep:["強い浮腫・正中偏位、出血、水頭症"],
+  ddx:["膠芽腫","脳膿瘍","多発性脳梗塞（亜急性期の造影）"]
+});
+
+C({id:"meningioma", name:"髄膜腫", reg:"頭部", sev:"rout", alias:"脳腫瘍 良性 dural tail",
+  keys:["無症状（偶然発見）","頭痛","けいれん","視覚異常・複視"],
+  v:[{tpl:"head-vent",m:"T1C",wl:"造影T1強調像",cap:"左前頭部の硬膜に広く接する、均一に強く造影される腫瘤。硬膜に沿った尾状の造影（dural tail）。",
+      les:`<ellipse cx="178" cy="72" rx="15" ry="15" fill="#e6e6e6"/><path d="M186 50 Q194 70 194 98" stroke="#e6e6e6" stroke-width="1.8" fill="none"/>`,
+      ann:[[178,72,234,40,"均一に造影される腫瘤"],[193,94,234,120,"dural tail"]]}],
+  sx:["無症状で偶然見つかることが多い","大きくなると頭痛、けいれん、局所症状"],
+  ct:["硬膜に接する等〜高吸収の腫瘤、石灰化","隣接する骨の肥厚"],
+  mri:["脳実質外腫瘍（脳との間に髄液の隙間）","均一な強い造影効果、dural tail sign"],
+  tech:["経過観察では前回と同じ条件・断面で大きさを比較できるように","石灰化の評価には CT"],
+  rep:["急な増大や強い浮腫"],
+  ddx:["硬膜転移","孤立性線維性腫瘍","神経鞘腫（小脳橋角部）"]
+});
+
+C({id:"abscess", name:"脳膿瘍", reg:"頭部", sev:"crit", alias:"膿瘍 感染 リング状造影",
+  keys:["発熱","頭痛","けいれん","片麻痺・脱力","意識障害","免疫低下・糖尿病"],
+  v:[{tpl:"head-vent",m:"T1C",wl:"造影T1強調像",cap:"右前頭葉の薄く均一なリング状造影。腫瘍よりも壁がなめらかなことが多い。",
+      les:`<circle cx="82" cy="86" r="14" fill="#3a3a3a" stroke="#e0e0e0" stroke-width="2.8"/>`, ann:[[82,72,6,30,"なめらかなリング状造影"]]},
+     {tpl:"head-vent",m:"DWI",wl:"DWI（b=1000）",cap:"内部が拡散強調像で強い高信号（膿の粘稠さによる拡散制限）。腫瘍の壊死との鑑別点です。",
+      les:`<circle cx="82" cy="86" r="13" fill="#f2f2f2"/>`, ann:[[82,86,6,40,"内部がDWI高信号"]]}],
+  sx:["発熱、頭痛、局所神経症状（すべてそろうとは限らない）","副鼻腔炎・中耳炎・歯科感染、心内膜炎、免疫不全"],
+  ct:["リング状造影を示す低吸収域、周囲浮腫"],
+  mri:["DWI：内部が高信号、ADC 低下（腫瘍壊死との鑑別に重要）","T2 で壁が低信号の縁取り"],
+  tech:["リング状造影を見たら DWI を必ず含める","脳室穿破は重篤：脳室内の DWI 高信号に注意"],
+  rep:["脳室穿破、強い浮腫・正中偏位"],
+  ddx:["膠芽腫","転移性脳腫瘍","脱髄性疾患（オープンリング）"]
+});
+
+C({id:"hsv", name:"単純ヘルペス脳炎", reg:"頭部", sev:"crit", alias:"HSV 脳炎 側頭葉",
+  keys:["発熱","異常行動・記憶障害","意識障害","けいれん","頭痛"],
+  v:[{tpl:"head-base",m:"FLAIR",wl:"FLAIR",cap:"両側（左右差あり）の側頭葉内側に高信号。島皮質に広がることもあります。",
+      les:`<path d="M54 120 Q62 106 80 116 Q90 136 76 152 Q60 156 54 140Z" fill="#d6d6d6"/><path d="M180 128 Q174 118 164 124 Q158 138 166 146 Q178 148 180 138Z" fill="#a8a8a8"/>`,
+      ann:[[70,132,6,170,"側頭葉内側の高信号"],[170,134,234,190,"反対側（軽い）"]]}],
+  sx:["発熱、頭痛に続く意識障害、異常行動、けいれん","早期治療（抗ウイルス薬）が予後を左右する"],
+  ct:["初期は正常のことが多い","進行すると側頭葉の低吸収、出血"],
+  mri:["FLAIR/T2：側頭葉内側・島皮質・帯状回の高信号（左右差）","DWI でも高信号","出血を伴うことがある"],
+  tech:["発熱＋意識障害では MRI の FLAIR・DWI が重要","不穏で体動が強いことがある：短い撮像シーケンスの選択を医師と相談"],
+  rep:["側頭葉の FLAIR/DWI 高信号"],
+  ddx:["自己免疫性脳炎（辺縁系脳炎）","脳梗塞（後大脳動脈領域）","けいれん後の変化"]
+});
+
+C({id:"ms", name:"多発性硬化症", reg:"頭部", sev:"rout", alias:"MS 脱髄 Dawson fingers",
+  keys:["視覚異常・複視","しびれ","片麻痺・脱力","めまい・ふらつき","歩行障害"],
+  v:[{tpl:"head-vent",m:"FLAIR",wl:"FLAIR",cap:"側脳室に対して垂直方向にのびる楕円形の高信号（Dawson's fingers）と、皮質直下の病変。",
+      les:`${[[100,80,-30],[140,80,30],[96,150,30],[144,152,-30],[92,112,0],[148,112,0]].map(([x,y,r])=>`<ellipse cx="${x}" cy="${y}" rx="3" ry="7" transform="rotate(${r} ${x} ${y})" fill="#e8e8e8"/>`).join("")}<ellipse cx="60" cy="74" rx="4" ry="3" fill="#e0e0e0"/>`,
+      ann:[[100,80,6,40,"脳室周囲の楕円形病変"],[60,74,6,100,"皮質直下の病変"],[144,152,234,190,"脳室に垂直"]]}],
+  sx:["若年〜中年女性に多い","視力低下（視神経炎）、しびれ、脱力、複視などを繰り返す"],
+  ct:["描出は乏しい"],
+  mri:["FLAIR/T2：脳室周囲・皮質直下・テント下・脊髄の楕円形病変","造影で活動性病変が増強（オープンリング）","時間的・空間的多発性が診断の鍵"],
+  tech:["矢状断 FLAIR で脳梁の病変を見る","経過観察は同じプロトコル・同じ断面で比較できるようにする"],
+  rep:["造影される新規病変（担当医へ）"],
+  ddx:["加齢・虚血による白質病変","視神経脊髄炎スペクトラム障害（NMOSD）","ADEM"]
+});
+
+C({id:"cvst", name:"脳静脈洞血栓症", reg:"頭部", sev:"crit", alias:"静脈洞血栓 dense delta empty delta",
+  keys:["頭痛","けいれん","意識障害","嘔吐・嘔気","視覚異常・複視"],
+  v:[{tpl:"head-vent",m:"CT",wl:W.brain,cap:"上矢状静脈洞の後部が三角形の高吸収（dense delta sign）。近くに出血を伴う静脈性梗塞。",
+      les:`<path d="M112 206 L128 206 L120 194Z" fill="#d6d6d6"/><ellipse cx="96" cy="182" rx="12" ry="9" fill="#666"/><circle cx="96" cy="182" r="5" fill="#d0d0d0"/>`,
+      ann:[[120,201,234,212,"dense delta sign"],[96,182,6,206,"静脈性梗塞・出血"]]},
+     {tpl:"head-vent",m:"CTC",wl:W.brain,cap:"造影では静脈洞の壁だけが造影され、中の血栓が抜けて見える（empty delta sign）。",
+      les:`<path d="M110 207 L130 207 L120 192Z" fill="#efefef"/><path d="M115 204 L125 204 L120 197Z" fill="#7a7a7a"/>`, ann:[[120,202,234,212,"empty delta sign"]]}],
+  sx:["頭痛（徐々に増悪）、けいれん、意識障害、うっ血乳頭","若年女性、経口避妊薬、妊娠・産褥期、脱水、悪性腫瘍"],
+  ct:["静脈洞・皮質静脈の高吸収（cord sign、dense delta sign）","動脈支配に合わない梗塞・出血（両側傍矢状部など）","造影：empty delta sign"],
+  mri:["MRV で静脈洞の描出欠損","T2* で血栓が低信号"],
+  tech:["CT venography / MR venography の撮像タイミング（静脈相）","動脈支配に合わない出血を見たら静脈洞を確認"],
+  rep:["静脈洞の高吸収・造影欠損","若年者の説明しにくい出血"],
+  ddx:["正常の静脈洞（ヘマトクリット高値でも高吸収）","くも膜顆粒"]
+});
+
+C({id:"pres", name:"可逆性後頭葉白質脳症（PRES）", reg:"頭部", sev:"urg", alias:"PRES 子癇 高血圧性脳症",
+  keys:["頭痛","けいれん","視覚異常・複視","意識障害","高血圧","妊娠の可能性"],
+  v:[{tpl:"head-vent",m:"FLAIR",wl:"FLAIR",cap:"両側の頭頂後頭葉の皮質下白質に左右対称性の高信号（血管性浮腫）。",
+      les:`<ellipse cx="84" cy="184" rx="20" ry="14" fill="#d6d6d6"/><ellipse cx="156" cy="184" rx="20" ry="14" fill="#d6d6d6"/>`,
+      ann:[[84,184,6,214,"後頭葉の高信号"],[156,184,234,214,"左右対称"]]}],
+  sx:["頭痛、視覚障害（見えにくい、皮質盲）、けいれん、意識障害","急な血圧上昇、妊娠高血圧（子癇）、腎不全、免疫抑制剤・抗癌剤"],
+  ct:["後頭葉の淡い低吸収（見えにくいことが多い）"],
+  mri:["FLAIR/T2：頭頂後頭葉の皮質下白質に対称性の高信号","DWI は等〜軽度高信号で ADC 上昇（血管性浮腫）が多い"],
+  tech:["妊娠中・産褥期は MRI が優先されることが多い（造影剤の使用は医師判断）","けいれん後で体動が強い場合は短い撮像を優先"],
+  rep:["出血の合併、DWI で ADC 低下（梗塞化）"],
+  ddx:["後大脳動脈領域の脳梗塞（片側、DWI 高信号）","静脈洞血栓症"]
+});
+
+/* ---- 頭頸部 ---- */
+C({id:"sinusitis", name:"急性副鼻腔炎", reg:"頭頸部", sev:"rout", alias:"上顎洞炎 鼻副鼻腔炎",
+  keys:["顔面痛・鼻閉","発熱","頭痛"],
+  v:[{tpl:"face-max",m:"CT",wl:"WL 40 / WW 350（軟部） または 骨条件",cap:"右上顎洞の液面形成（air-fluid level）と、左上顎洞の粘膜肥厚。",
+      les:`<path d="M57 100 L103 100 L102 120 Q100 130 90 130 L66 128 Q56 126 56 116Z" fill="{fluid}"/><path d="M182 70 Q184 60 170 58 L140 62 Q134 64 136 76 L138 120 Q140 130 150 130 L174 128 Q184 126 184 116Z" fill="none" stroke="{soft}" stroke-width="7" transform="translate(0,0)"/>`,
+      ann:[[80,100,6,40,"液面形成"],[176,90,234,40,"粘膜肥厚"]]}],
+  sx:["鼻閉、膿性鼻汁、頬部痛・頭重感、発熱"],
+  ct:["液面形成は急性炎症を示唆","粘膜肥厚、自然口の閉塞","合併症：眼窩内・頭蓋内への波及（眼窩蜂窩織炎、硬膜外膿瘍）"],
+  mri:["合併症（眼窩・頭蓋内）評価に有用"],
+  tech:["骨条件・冠状断で自然口（OMC）を評価","眼の腫れ・視力障害を伴う場合は造影で合併症を評価（医師判断）"],
+  rep:["眼窩内膿瘍・頭蓋内への波及"],
+  ddx:["歯性上顎洞炎","真菌性副鼻腔炎","腫瘍"]
+});
+
+C({id:"blowout", name:"眼窩吹き抜け骨折", reg:"頭頸部", sev:"urg", alias:"眼窩骨折 内側壁 下壁 trapdoor",
+  keys:["頭部外傷","眼周囲の腫れ","視覚異常・複視","嘔吐・嘔気"],
+  v:[{tpl:"face-orbit",m:"CTB",wl:W.bone,cap:"右眼窩内側壁（紙様板）が篩骨洞側に陥没し、眼窩内脂肪が逸脱。眼窩内に空気。",
+      les:`<path d="M101 56 L108 122" stroke="#000" stroke-width="3"/><path d="M101 66 Q116 90 106 116" stroke="#f4f4f4" stroke-width="1.6" fill="none"/><path d="M102 74 Q114 90 104 110Z" fill="#4a4a4a"/><circle cx="72" cy="104" r="2.4" fill="#000"/><circle cx="66" cy="96" r="1.8" fill="#000"/>`,
+      ann:[[110,90,6,150,"内側壁の陥没"],[70,100,6,60,"眼窩内の空気"]]}],
+  sx:["顔面打撲後の眼周囲の腫れ、複視（上下方向が多い）","鼻をかんだ後の眼瞼腫脹（眼窩気腫）","若年者の閉鎖型（trapdoor）骨折では悪心・嘔吐、徐脈を伴うことがある"],
+  ct:["下壁・内側壁の骨折と眼窩内容の逸脱","外眼筋の嵌頓（trapdoor 型は骨折が目立たない）","眼窩内気腫、上顎洞・篩骨洞内の血液"],
+  mri:["筋の嵌頓評価に使われることがある"],
+  tech:["冠状断再構成が必須（下壁骨折は軸位で見えにくい）","薄いスライス・骨関数で再構成"],
+  rep:["外眼筋の嵌頓が疑われる所見（緊急手術の対象になりうる）","眼球損傷、視神経管骨折"],
+  ddx:["正常の眼窩下神経管","古い骨折"]
+});
+
+C({id:"pta", name:"扁桃周囲膿瘍", reg:"頭頸部", sev:"urg", alias:"扁桃周囲炎 咽頭痛",
+  keys:["咽頭痛","発熱","嚥下困難・流涎","開口障害"],
+  v:[{tpl:"neck",m:"CTC",wl:W.med,cap:"右口蓋扁桃の外側に辺縁が造影される低吸収（膿瘍）。気道が左に押されています。",
+      les:`<ellipse cx="94" cy="104" rx="12" ry="15" fill="{fluid}" stroke="#c8c8c8" stroke-width="2"/><ellipse cx="120" cy="108" rx="15" ry="9" fill="{soft}"/><ellipse cx="128" cy="108" rx="9" ry="6" fill="#000"/>`,
+      ann:[[92,104,6,80,"辺縁が造影される膿瘍"],[128,108,234,84,"偏位した気道"]]}],
+  sx:["片側の強い咽頭痛、嚥下痛、開口障害、含み声","発熱、流涎"],
+  ct:["扁桃周囲の辺縁が造影される低吸収","副咽頭間隙・深頸部への進展"],
+  mri:["通常は CT で評価"],
+  tech:["造影CT（静脈相）で膿瘍壁を評価","仰臥位で呼吸が苦しくなることがある：体位の工夫と気道の観察"],
+  rep:["気道狭窄、深頸部・縦隔への進展"],
+  ddx:["扁桃炎（膿瘍形成なし）","咽後膿瘍","腫瘍"]
+});
+
+C({id:"rpa", name:"咽後膿瘍・深頸部膿瘍", reg:"頭頸部", sev:"crit", alias:"深頸部感染 降下性縦隔炎",
+  keys:["咽頭痛","発熱","頸部痛","嚥下困難・流涎","呼吸困難","免疫低下・糖尿病"],
+  v:[{tpl:"neck",m:"CTC",wl:W.med,cap:"咽頭後間隙の辺縁が造影される液体貯留。気道が前方から圧排されています。",
+      les:`<ellipse cx="120" cy="126" rx="24" ry="8" fill="{fluid}" stroke="#c8c8c8" stroke-width="2"/><ellipse cx="120" cy="106" rx="11" ry="5" fill="#000"/>`,
+      ann:[[120,126,234,124,"咽頭後間隙の膿瘍"],[120,106,234,84,"狭くなった気道"]]}],
+  sx:["咽頭痛、頸部痛、頸部の可動制限、嚥下困難","発熱、呼吸困難（気道狭窄）","糖尿病など免疫低下がリスク"],
+  ct:["咽頭後間隙・副咽頭間隙などの辺縁造影を伴う液体貯留、ガス","縦隔への進展（降下性壊死性縦隔炎）は重篤"],
+  mri:["通常は CT"],
+  tech:["撮像範囲は頭蓋底〜縦隔まで（下方進展の確認）","仰臥位で呼吸困難が悪化しうる：気道の観察と医師の同席を検討"],
+  rep:["気道狭窄","縦隔への進展、ガス産生"],
+  ddx:["咽後浮腫（膿瘍壁なし）","石灰沈着性頸長筋腱炎"]
+});
+
+C({id:"ica-dissection", name:"内頸動脈解離", reg:"頭頸部", sev:"urg", alias:"頸動脈解離 椎骨動脈解離 若年脳梗塞",
+  keys:["頸部痛","頭痛","片麻痺・脱力","視覚異常・複視","めまい・ふらつき"],
+  v:[{tpl:"neck",m:"CTC",wl:W.pa,cap:"右内頸動脈の内腔が細く偏在し、周囲の壁が三日月状に厚い（壁内血腫）。",
+      les:`<circle cx="88" cy="132" r="7" fill="#8a8a8a"/><circle cx="90" cy="130" r="2.6" fill="#efefef"/>`,
+      ann:[[88,132,6,110,"狭くなった内腔と壁内血腫"]]}],
+  sx:["頸部痛・頭痛に続く脳梗塞症状","ホルネル症候群（眼瞼下垂・縮瞳）","若年者、軽い外傷・カイロプラクティック・スポーツ後"],
+  ct:["CTA：内腔の狭小化（string sign）、偽腔、壁内血腫","若年者の脳梗塞では原因として考慮"],
+  mri:["脂肪抑制T1 で壁内血腫が三日月状の高信号","MRA で狭窄・閉塞"],
+  tech:["脂肪抑制T1（black blood）を頸部に追加すると壁内血腫が分かりやすい","CTA は頸部〜頭蓋内まで連続して撮る"],
+  rep:["若年者の脳梗塞＋頸動脈の狭窄・壁内血腫"],
+  ddx:["動脈硬化性狭窄","線維筋性異形成"]
+});
+
+C({id:"epiglottitis", name:"急性喉頭蓋炎", reg:"頭頸部", sev:"crit", alias:"喉頭蓋 気道閉塞",
+  keys:["咽頭痛","嚥下困難・流涎","呼吸困難","発熱"],
+  v:[{tpl:"neck",m:"CTC",label:"造影CT（喉頭蓋レベルの模式）",wl:W.med,cap:"喉頭蓋が腫れて厚くなり、気道が狭くなっています（模式図は中咽頭レベルの図を流用）。",
+      les:`<ellipse cx="120" cy="100" rx="16" ry="8" fill="#808080"/><ellipse cx="120" cy="111" rx="9" ry="4" fill="#000"/>`,
+      ann:[[120,98,234,60,"腫大した喉頭蓋"],[120,111,234,100,"狭くなった気道"]]}],
+  sx:["強い咽頭痛・嚥下痛なのに咽頭所見が乏しい","含み声、流涎、呼吸困難、前かがみの姿勢を好む"],
+  ct:["喉頭蓋・披裂喉頭蓋ひだの腫大、気道狭窄","膿瘍形成"],
+  mri:["気道リスクのため通常行わない"],
+  tech:["仰臥位で急に窒息しうる：撮影するかどうか・体位は医師判断。撮影時は医師同席と気道確保の準備","撮影は短時間で、患者から目を離さない"],
+  rep:["気道狭窄の所見","撮影中の呼吸状態の悪化（すぐに中止して医師へ）"],
+  ddx:["扁桃周囲膿瘍","咽後膿瘍","異物"]
+});
+
+</script>
+<script>/* data-spine-msk.js */
+/* 脊椎・骨関節・アーチファクト */
+
+C({id:"lhnp", name:"腰椎椎間板ヘルニア", reg:"脊椎", sev:"rout", alias:"ヘルニア 坐骨神経痛 L4/5",
+  keys:["腰痛","下肢のしびれ・痛み","歩行障害"],
+  v:[{tpl:"spine-l",m:"T2",wl:"T2強調像 矢状断",cap:"L4/5 椎間板が後方に突出し、硬膜嚢を圧排。変性した椎間板は T2 で黒く（低信号）なります。",
+      les:`<ellipse cx="94" cy="173" rx="16" ry="3.4" fill="{disc}"/><path d="M122 167 Q146 174 122 181Z" fill="#4a4a4a"/>`,
+      ann:[[134,174,234,180,"後方に突出した髄核"],[94,173,6,160,"変性した椎間板（黒い）"]]}],
+  sx:["腰痛と片側の下肢痛・しびれ（坐骨神経痛）","20〜40代に多い","排尿障害・会陰部のしびれは馬尾障害（緊急）"],
+  ct:["椎間板の後方突出（CT では見えにくい）"],
+  mri:["T2 矢状断・横断で突出の部位と神経根の圧排","脱出した髄核は時間とともに縮小することがある"],
+  tech:["矢状断で高位を決め、横断はヘルニアの椎間に平行に設定","痛みで仰臥位が保てない場合は膝下にクッション"],
+  rep:["巨大ヘルニアによる馬尾圧迫（排尿障害を伴う場合は緊急）"],
+  ddx:["脊柱管狭窄症","神経鞘腫","硬膜外膿瘍"]
+});
+
+C({id:"lss", name:"腰部脊柱管狭窄症", reg:"脊椎", sev:"rout", alias:"間欠性跛行 黄色靱帯肥厚",
+  keys:["腰痛","下肢のしびれ・痛み","歩行障害","高齢者"],
+  v:[{tpl:"spine-l",m:"T2",wl:"T2強調像 矢状断",cap:"L4/5 で椎間板の膨隆と黄色靱帯の肥厚により、硬膜嚢が前後から挟まれて細くなっています。",
+      les:`<ellipse cx="94" cy="173" rx="16" ry="3.4" fill="{disc}"/><path d="M122 168 Q136 173 122 178Z" fill="{disc}"/><path d="M151 156 Q132 172 151 188Z" fill="{lig}"/>`,
+      ann:[[130,173,6,200,"椎間板の膨隆"],[142,172,234,180,"黄色靱帯の肥厚"]]}],
+  sx:["歩くと下肢がしびれて休むと楽になる（間欠性跛行）","前かがみで楽になる","高齢者に多い"],
+  ct:["骨性狭窄、椎間関節の肥厚（骨条件）"],
+  mri:["T2 横断で硬膜嚢の断面積の減少","矢状断で多椎間の狭窄"],
+  tech:["横断は各椎間に平行に、狭窄部を連続して撮る","腰痛で動きやすい：撮像時間と姿勢の工夫"],
+  rep:["急な排尿障害・麻痺（馬尾症候群）を伴う場合"],
+  ddx:["閉塞性動脈硬化症（血管性跛行）","椎間板ヘルニア"]
+});
+
+C({id:"osteoporotic-fx", name:"骨粗鬆症性椎体骨折", reg:"脊椎", sev:"rout", alias:"圧迫骨折 新鮮骨折 STIR",
+  keys:["腰痛","背部痛","転倒","高齢者"],
+  v:[{tpl:"spine-l",m:"STIR",wl:"STIR 矢状断",cap:"L1 椎体が楔状につぶれ、STIR で高信号（骨髄浮腫）＝新しい骨折。L3 の変形は信号変化がなく古い骨折です。",
+      les:`<path d="M64 10 L124 10 L64 22Z" fill="{soft}"/><path d="M64 22 L124 11 L124 42 L64 42Z" fill="#dcdcdc" stroke="{bone}" stroke-width="2"/><path d="M64 94 L124 94 L64 102Z" fill="{soft}"/>`,
+      ann:[[94,30,6,40,"新しい骨折（高信号）"],[80,100,6,120,"古い骨折（信号変化なし）"]]}],
+  sx:["軽い尻もち・くしゃみ・持ち上げ動作後の腰背部痛","高齢女性、ステロイド内服","痛みがはっきりしないこともある"],
+  ct:["椎体の楔状変形、終板の陥凹","後壁の損傷（不安定性）の評価"],
+  mri:["STIR/T2 脂肪抑制で骨髄浮腫（高信号）＝新鮮骨折","T1 で低信号","新旧の判定に MRI が有用"],
+  tech:["STIR 矢状断を含める","単純X線で見えなくても MRI で見つかることがある"],
+  rep:["後壁の突出による脊柱管狭窄","病的骨折を疑う所見（腫瘍）"],
+  ddx:["転移性脊椎腫瘍による病的骨折","化膿性脊椎炎"]
+});
+
+C({id:"burst-fx", name:"椎体破裂骨折", reg:"脊椎", sev:"crit", alias:"胸腰椎移行部 外傷 骨片 脊柱管",
+  keys:["腰痛","背部痛","高エネルギー外傷","下肢のしびれ・痛み","排尿・排便障害","四肢麻痺"],
+  v:[{tpl:"spine-l",m:"CTB",wl:W.bone,cap:"L1 椎体が粉砕し、後方の骨片が脊柱管内に突出（retropulsion）。",
+      les:`<path d="M64 10 L124 10 L124 16 L64 16Z" fill="{soft}"/><path d="M70 22 L118 34 M86 40 L100 16" stroke="#000" stroke-width="2"/><path d="M124 15 Q140 24 124 36Z" fill="{marrow}" stroke="{bone}" stroke-width="1.5"/>`,
+      ann:[[94,28,6,40,"粉砕した椎体"],[132,25,234,40,"脊柱管内の骨片"]]}],
+  sx:["転落・交通事故など高エネルギー外傷","腰背部痛、下肢の麻痺・しびれ、排尿障害"],
+  ct:["椎体の粉砕、後壁骨片の脊柱管内突出","後方要素（椎弓・棘突起）の骨折は不安定性を示す","胸腰椎移行部（T11〜L2）に多い"],
+  mri:["脊髄・馬尾の損傷、後方靱帯複合体の損傷"],
+  tech:["脊椎損傷を疑う間は体位変換を最小限に（ログロール）","矢状断・冠状断の再構成で骨片と脊柱管を評価"],
+  rep:["脊柱管内への骨片突出","多発外傷では他部位の損傷の有無"],
+  ddx:["骨粗鬆症性圧迫骨折","病的骨折"]
+});
+
+C({id:"spondylodiscitis", name:"化膿性脊椎炎・椎間板炎", reg:"脊椎", sev:"urg", alias:"脊椎炎 椎間板炎 硬膜外膿瘍",
+  keys:["腰痛","背部痛","発熱","免疫低下・糖尿病","高齢者"],
+  v:[{tpl:"spine-l",m:"STIR",wl:"STIR 矢状断",cap:"L3/4 椎間板と隣り合う椎体の上下が高信号。椎間板の前方・後方に膿瘍があります。",
+      les:`<rect x="64" y="110" width="60" height="16" fill="#cfcfcf"/><rect x="64" y="136" width="60" height="16" fill="#cfcfcf"/><rect x="66" y="126" width="56" height="10" fill="#f0f0f0"/><path d="M128 120 Q140 131 128 142Z" fill="#bdbdbd"/><path d="M62 116 Q46 131 62 146Z" fill="#d6d6d6"/>`,
+      ann:[[94,131,6,150,"椎間板と隣接椎体の高信号"],[134,131,234,120,"硬膜外膿瘍"],[54,131,6,96,"椎体前方の膿瘍"]]}],
+  sx:["持続する腰背部痛、発熱（ないこともある）","高齢者、糖尿病、透析、感染性心内膜炎、術後"],
+  ct:["終板の破壊・侵食（進行例）","腸腰筋膿瘍の合併"],
+  mri:["椎間板と隣接椎体の T2/STIR 高信号、T1 低信号","造影で硬膜外膿瘍・椎体周囲膿瘍","早期診断は MRI が最も鋭敏"],
+  tech:["造影脂肪抑制T1 を追加して膿瘍を評価（医師判断）","痛みが強いので体位の工夫"],
+  rep:["硬膜外膿瘍による脊髄・馬尾圧迫","腸腰筋膿瘍"],
+  ddx:["骨粗鬆症性骨折","転移性脊椎腫瘍（椎間板は保たれやすい）","変性による終板変化（Modic 変化）"]
+});
+
+C({id:"spine-mets", name:"転移性脊椎腫瘍", reg:"脊椎", sev:"urg", alias:"骨転移 病的骨折 脊髄圧迫",
+  keys:["背部痛","腰痛","下肢のしびれ・痛み","歩行障害","体重減少","排尿・排便障害"],
+  v:[{tpl:"spine-l",m:"T1",wl:"T1強調像 矢状断",cap:"T1 で明るいはずの骨髄が、L2 の一部と L4 全体で黒く（低信号）置き換わっています。椎間板は保たれます。",
+      les:`<ellipse cx="96" cy="68" rx="18" ry="11" fill="#3a3a3a"/><rect x="65" y="137" width="58" height="30" rx="3" fill="#3a3a3a"/><path d="M156 140 L176 138 L190 142 L190 160 L176 166 L156 164Z" fill="#3a3a3a"/>`,
+      ann:[[96,68,6,70,"L2 の転移"],[94,152,6,150,"L4 全体が低信号"],[176,152,234,150,"椎弓への進展"]]}],
+  sx:["夜間・安静時も続く背部痛","癌の既往（肺・乳・前立腺・腎・甲状腺など）","下肢麻痺・排尿障害は脊髄圧迫のサイン（緊急）"],
+  ct:["溶骨性・造骨性の変化、椎弓根の破壊"],
+  mri:["T1 で骨髄の低信号置換（最も鋭敏）","STIR で高信号","硬膜外への進展・脊髄圧迫"],
+  tech:["T1 矢状断で全脊椎を評価（スクリーニング）","痛みで長時間の撮像が難しい：優先順位を医師と相談"],
+  rep:["脊髄・馬尾の圧迫（麻痺の進行前に治療が必要）"],
+  ddx:["骨粗鬆症性骨折","化膿性脊椎炎","血管腫"]
+});
+
+C({id:"cspine-fx", name:"頸椎脱臼骨折", reg:"脊椎", sev:"crit", alias:"頸椎損傷 外傷 頸髄損傷",
+  keys:["頸部痛","四肢麻痺","しびれ","高エネルギー外傷","転倒"],
+  v:[{tpl:"spine-c",m:"CTB",wl:W.bone,cap:"C5 椎体が C6 に対して前方へずれ（前方すべり）、椎前軟部組織が腫れています。",
+      les:`<rect x="62" y="132" width="50" height="28" fill="{soft}"/><rect x="62" y="138" width="38" height="20" rx="3" fill="{marrow}" stroke="{bone}" stroke-width="2"/><rect x="40" y="120" width="22" height="74" fill="{soft}"/>`,
+      ann:[[80,148,6,148,"C5 の前方すべり"],[50,160,6,200,"椎前軟部組織の腫脹"]]},
+     {tpl:"spine-c",m:"T2",wl:"T2強調像 矢状断",cap:"脊髄がずれた部位で圧迫され、内部が高信号（浮腫・損傷）。",
+      les:`<rect x="62" y="132" width="50" height="28" fill="{csf}"/><rect x="62" y="138" width="38" height="20" rx="3" fill="{marrow}" stroke="{bone}" stroke-width="2"/><rect x="40" y="120" width="22" height="74" fill="#9a9a9a"/><ellipse cx="127" cy="160" rx="5" ry="14" fill="#e6e6e6"/>`,
+      ann:[[127,160,234,160,"脊髄の高信号"]]}],
+  sx:["交通事故・転落後の頸部痛","四肢麻痺・しびれ、呼吸障害（高位損傷）"],
+  ct:["椎体のずれ、骨折、椎間関節の脱臼（矢状断で jumped facet）","椎前軟部組織の腫脹"],
+  mri:["脊髄の圧迫・浮腫・出血、靱帯損傷、椎間板損傷"],
+  tech:["頸椎カラーを外さず、体位変換は複数人で軸を保って","矢状断・冠状断の再構成は必須","高位頸髄損傷では呼吸状態の観察"],
+  rep:["脱臼・骨折、脊柱管狭窄","撮影中の呼吸状態の変化"],
+  ddx:["変性すべり","小児の偽性亜脱臼（C2/3）"]
+});
+
+C({id:"ccs", name:"非骨傷性頸髄損傷（中心性頸髄損傷）", reg:"脊椎", sev:"crit", alias:"中心性頸髄損傷 頸椎症 過伸展",
+  keys:["四肢麻痺","しびれ","転倒","頸部痛","高齢者"],
+  v:[{tpl:"spine-c",m:"T2",wl:"T2強調像 矢状断",cap:"骨折はないが、頸椎症による狭窄部（C4/5・C5/6）で脊髄内に高信号。",
+      les:`<path d="M108 130 Q120 135 108 140Z" fill="{disc}"/><path d="M108 156 Q120 161 108 166Z" fill="{disc}"/><path d="M142 130 Q132 135 142 140Z" fill="{lig}"/><path d="M142 156 Q132 161 142 166Z" fill="{lig}"/><ellipse cx="127" cy="146" rx="4" ry="16" fill="#e8e8e8"/>`,
+      ann:[[127,146,234,146,"脊髄内の高信号"],[114,135,6,96,"椎間板の膨隆"]]}],
+  sx:["高齢者が転倒して顔面を打つ（頸部の過伸展）","上肢に強いしびれ・麻痺（手の症状が目立つ）"],
+  ct:["骨折なし、頸椎症性変化（骨棘、OPLL）"],
+  mri:["脊髄内の T2 高信号（狭窄部）","靱帯・椎間板の損傷"],
+  tech:["骨折がなくても脊髄損傷はありうる：CT が正常でも MRI の検討を","カラー固定のまま撮像できるコイル選択"],
+  rep:["脊髄内の高信号、硬膜外血腫"],
+  ddx:["頸椎症性脊髄症（慢性）","脊髄梗塞"]
+});
+
+C({id:"seh", name:"特発性脊髄硬膜外血腫", reg:"脊椎", sev:"crit", alias:"硬膜外血腫 抗凝固",
+  keys:["頸部痛","背部痛","四肢麻痺","しびれ","抗凝固薬の内服"],
+  v:[{tpl:"spine-c",m:"T2",wl:"T2強調像 矢状断",cap:"脊柱管の後方に紡錘形の液体貯留（血腫）があり、脊髄を前方へ圧迫。",
+      les:`<path d="M142 118 Q122 160 142 204Z" fill="#9a9a9a"/>`, ann:[[132,160,234,160,"硬膜外血腫"]]}],
+  sx:["突然の首・背中の激痛に続く四肢・下肢の麻痺","抗凝固薬内服、高血圧","脳卒中と間違われることがある（片麻痺で発症）"],
+  ct:["脊柱管内の高吸収（見逃しやすい）"],
+  mri:["硬膜外の紡錘形の血腫、脊髄圧迫","発症からの時間で信号が変化"],
+  tech:["突然の首の痛み＋麻痺では脊髄 MRI を考慮","頭部 CT が正常な片麻痺ではこの疾患も念頭に"],
+  rep:["脊髄の圧迫（緊急手術の対象になりうる）"],
+  ddx:["硬膜外膿瘍","脳梗塞"]
+});
+
+/* ---- 骨・関節 ---- */
+C({id:"pelvic-fx", name:"骨盤骨折", reg:"骨・関節", sev:"crit", alias:"骨盤輪骨折 恥骨骨折 仙骨骨折 出血性ショック",
+  keys:["高エネルギー外傷","股関節痛","ショック・血圧低下","転倒","高齢者"],
+  v:[{tpl:"hip-cor",m:"CTB",wl:W.bone,cap:"右恥骨上枝と左仙骨に骨折線。骨盤輪の前後 2 か所の骨折は不安定です。",
+      les:`<path d="M102 126 L110 138" stroke="#000" stroke-width="2.6"/><path d="M128 34 L124 78" stroke="#000" stroke-width="2.4"/>`,
+      ann:[[106,132,6,212,"恥骨の骨折"],[126,56,234,30,"仙骨の骨折"]]},
+     {tpl:"hip-cor",m:"CTC",wl:W.abd,cap:"造影 CT で骨盤内の血腫と、動脈からの造影剤の漏れ（extravasation）。",
+      les:`<ellipse cx="100" cy="122" rx="14" ry="12" fill="#8a8a8a"/><circle cx="100" cy="120" r="3" fill="#f4f4f4"/>`,
+      ann:[[100,120,6,226,"造影剤の血管外漏出"]]}],
+  sx:["交通事故・転落後の骨盤部痛、出血性ショック","高齢者では転倒でも恥骨・仙骨骨折"],
+  ct:["骨盤輪の骨折（前方・後方）、仙腸関節の離開","骨盤内血腫、動脈相での造影剤漏出（塞栓術の適応）"],
+  mri:["CT で見えない脆弱性骨折（仙骨）の検出"],
+  tech:["外傷全身CT（動脈相＋静脈相）で出血源を評価","造影剤漏出は医師に即時共有（塞栓術の判断）","骨盤固定具を外さない"],
+  rep:["造影剤の血管外漏出（活動性出血）","不安定型骨折、尿道・膀胱損傷の疑い"],
+  ddx:["正常の骨端線（若年者）","古い骨折"]
+});
+
+C({id:"fnf", name:"大腿骨頸部骨折", reg:"骨・関節", sev:"urg", alias:"大腿骨近位部骨折 不顕性骨折 転子部骨折",
+  keys:["股関節痛","転倒","歩行障害","高齢者"],
+  v:[{tpl:"hip-cor",m:"CTB",wl:W.bone,cap:"右大腿骨頸部を横切る骨折線。",
+      les:`<path d="M64 128 L78 142" stroke="#000" stroke-width="2.6"/>`, ann:[[71,135,6,226,"頸部の骨折線"]]},
+     {tpl:"hip-cor",m:"T1",wl:"T1強調像 冠状断",cap:"X線・CT で分からない骨折（不顕性骨折）も、T1 では明るい骨髄の中の黒い線として見えます。",
+      les:`<path d="M64 128 L78 142" stroke="#1a1a1a" stroke-width="3"/><path d="M58 124 Q72 136 84 146" stroke="#6a6a6a" stroke-width="6" opacity="0.6"/>`, ann:[[71,135,6,226,"T1 低信号の骨折線"]]}],
+  sx:["高齢者が転倒した後に立てない・股関節が痛い","歩けることもある（不顕性骨折）"],
+  ct:["骨折線、骨頭のずれ","大腿骨転子部骨折との区別（治療法が違う）"],
+  mri:["T1 で骨折線が低信号、STIR で骨髄浮腫","X線で分からない骨折の検出に最も鋭敏"],
+  tech:["痛みが強いので移動・体位は複数人で愛護的に","X線で骨折が見えない高齢者の股関節痛は MRI を検討（医師判断）"],
+  rep:["転位のある骨折","病的骨折の疑い"],
+  ddx:["恥骨骨折","大腿骨頭壊死","変形性股関節症"]
+});
+
+C({id:"onfh", name:"大腿骨頭壊死症", reg:"骨・関節", sev:"rout", alias:"特発性大腿骨頭壊死 ステロイド band",
+  keys:["股関節痛","歩行障害"],
+  v:[{tpl:"hip-cor",m:"T1",wl:"T1強調像 冠状断",cap:"両側の大腿骨頭に、壊死部を取り囲む帯状の低信号（band pattern）。",
+      les:`<path d="M70 106 Q82 120 96 104" stroke="#1e1e1e" stroke-width="2.6" fill="none"/><path d="M144 104 Q158 120 170 106" stroke="#1e1e1e" stroke-width="2.6" fill="none"/>`,
+      ann:[[82,114,6,72,"帯状の低信号"],[158,114,234,72,"反対側にも"]]}],
+  sx:["股関節痛（急に始まることもある）","ステロイド大量投与歴、アルコール多飲","両側性が多い"],
+  ct:["骨頭の圧潰、軟骨下骨折（進行例）"],
+  mri:["T1 で骨頭内の帯状低信号（早期診断に最も有用）","T2 で double line sign"],
+  tech:["両側の股関節を同時に撮像（冠状断 T1 を含む）"],
+  rep:["骨頭の圧潰"],
+  ddx:["一過性大腿骨頭萎縮症","軟骨下脆弱性骨折","変形性股関節症"]
+});
+
+C({id:"acl", name:"前十字靱帯損傷", reg:"骨・関節", sev:"rout", alias:"ACL 断裂 スポーツ外傷 骨挫傷",
+  keys:["膝の痛み・腫れ","歩行障害"],
+  v:[{tpl:"knee-sag",m:"PDFS",wl:"脂肪抑制プロトン密度強調像 矢状断",cap:"前十字靱帯の連続性が途絶え、高信号に置き換わっています。大腿骨外側顆と脛骨後方に骨挫傷（高信号）、関節液の貯留。",
+      les:`<path d="M142 104 L110 145" stroke="#3a3a3a" stroke-width="6"/><path d="M142 104 L134 114 M116 138 L110 145" stroke="#0c0c0c" stroke-width="5"/><ellipse cx="126" cy="125" rx="10" ry="6" transform="rotate(-52 126 125)" fill="#d6d6d6"/><ellipse cx="116" cy="128" rx="12" ry="5" fill="#bdbdbd"/><ellipse cx="156" cy="156" rx="10" ry="6" fill="#bdbdbd"/><path d="M84 30 Q106 56 94 80" stroke="#f0f0f0" stroke-width="7" fill="none"/>`,
+      ann:[[126,125,234,78,"断裂した前十字靱帯"],[116,128,6,110,"骨挫傷"],[156,156,234,150,"脛骨後方の骨挫傷"],[96,56,6,40,"関節液"]]}],
+  sx:["スポーツ中のジャンプ着地・急な方向転換で「ブツッ」という音","急速な膝の腫れ（関節内血腫）、膝くずれ"],
+  ct:["脛骨外側の剥離骨折（Segond 骨折）がヒントになる"],
+  mri:["靱帯の連続性途絶、走行異常、信号上昇","大腿骨外側顆・脛骨後外側の骨挫傷（典型的な組み合わせ）","半月板損傷の合併"],
+  tech:["前十字靱帯の走行に平行な斜矢状断が見やすい","膝を軽度屈曲させ、動かないように固定"],
+  rep:["骨折の合併"],
+  ddx:["部分断裂","粘液変性"]
+});
+
+C({id:"meniscus", name:"半月板損傷", reg:"骨・関節", sev:"rout", alias:"半月板断裂 内側半月板 後角",
+  keys:["膝の痛み・腫れ","歩行障害"],
+  v:[{tpl:"knee-sag",m:"PDFS",wl:"脂肪抑制プロトン密度強調像 矢状断",cap:"本来真っ黒な半月板後角の中に、関節面まで達する線状の高信号（断裂）。",
+      les:`<path d="M152 146.5 L169 144.5" stroke="#f0f0f0" stroke-width="1.4"/>`, ann:[[160,146,234,150,"関節面に達する高信号"]]}],
+  sx:["膝の痛み、引っかかり感（キャッチング）、ロッキング","中高年は変性断裂、若年はスポーツ外傷"],
+  ct:["描出困難"],
+  mri:["関節面に達する高信号＝断裂（関節面に達しない場合は変性）","バケツ柄断裂では double PCL sign"],
+  tech:["矢状断・冠状断の両方で評価","スライス厚を薄く（3mm 前後）"],
+  rep:["バケツ柄断裂（ロッキング）"],
+  ddx:["半月板の変性（関節面に達しない）","正常の横靱帯などの構造"]
+});
+
+C({id:"tpf", name:"脛骨高原骨折", reg:"骨・関節", sev:"urg", alias:"脛骨プラトー骨折 陥没骨折 lipohemarthrosis",
+  keys:["膝の痛み・腫れ","転倒","高エネルギー外傷","歩行障害"],
+  v:[{tpl:"knee-sag",m:"CTB",wl:W.bone,cap:"脛骨関節面の一部が陥没し、骨折線が下方にのびています。",
+      les:`<path d="M112 144 L144 144 L140 154 L116 154Z" fill="{soft}"/><path d="M116 150 L140 150 L138 158 L118 158Z" fill="{marrow}" stroke="{bone}" stroke-width="1.5"/><path d="M128 158 L120 204" stroke="#000" stroke-width="2"/>`,
+      ann:[[128,154,234,150,"陥没した関節面"],[124,182,6,200,"骨折線"]]}],
+  sx:["転倒・交通事故後の膝の腫れと痛み、荷重できない","関節内に脂肪と血液の層（lipohemarthrosis）は関節内骨折を示唆"],
+  ct:["陥没の深さ・範囲、骨片の数（手術計画に必須）","関節液に脂肪と血液の液面"],
+  mri:["靱帯・半月板損傷の合併"],
+  tech:["薄いスライス・矢状断・冠状断・3D 再構成","健側と比べられるように"],
+  rep:["関節面の陥没、コンパートメント症候群が疑われる強い腫脹（臨床で判断）"],
+  ddx:["骨挫傷","正常の骨端線（若年者）"]
+});
+
+C({id:"rcuff", name:"腱板断裂", reg:"骨・関節", sev:"rout", alias:"棘上筋腱断裂 肩",
+  keys:["肩の痛み","高齢者"],
+  v:[{tpl:"shoulder-cor",m:"PDFS",wl:"脂肪抑制T2（プロトン密度）斜冠状断",cap:"棘上筋腱の大結節付着部に高信号の欠損（全層断裂）。肩峰下滑液包に液体。",
+      les:`<path d="M152 99 Q168 105 180 118" stroke="#f0f0f0" stroke-width="7" fill="none"/><path d="M124 90 L196 92" stroke="#f0f0f0" stroke-width="3"/>`,
+      ann:[[166,106,234,116,"腱の欠損（断裂）"],[180,92,234,40,"肩峰下滑液包の液体"]]}],
+  sx:["肩の痛み（夜間痛）、腕が上がらない","中高年、転倒・重いものを持った後、または誘因なく"],
+  ct:["描出困難"],
+  mri:["腱の欠損部が液体の高信号","断端の退縮、筋萎縮・脂肪変性（手術成績に関係）"],
+  tech:["斜冠状断は棘上筋腱に平行に設定","腕は体の横で軽い外旋位、動かないように固定"],
+  rep:["（通常は待機的）"],
+  ddx:["腱板炎・腱症（欠損なし）","石灰沈着性腱板炎"]
+});
+
+/* ---- アーチファクト ---- */
+C({id:"art-metal", name:"金属アーチファクト（CT）", reg:"アーチファクト", sev:"rout", alias:"人工関節 ストリーク MAR",
+  keys:[],
+  v:[{tpl:"pelvis",m:"CT",wl:W.abd,cap:"右人工骨頭（金属）から白と黒の筋状の影（ストリーク）が広がり、膀胱や直腸が見えにくくなっています。",
+      les:`<circle cx="64" cy="140" r="20" fill="#ffffff"/><path d="M84 132 L200 120" stroke="#000" stroke-width="6" opacity="0.7"/><path d="M84 146 L200 158" stroke="#000" stroke-width="5" opacity="0.6"/><path d="M80 124 L170 70" stroke="#fff" stroke-width="2" opacity="0.6"/><path d="M80 154 L170 206" stroke="#fff" stroke-width="2" opacity="0.6"/><path d="M84 140 L230 140" stroke="#fff" stroke-width="1.5" opacity="0.5"/>`,
+      ann:[[64,140,6,100,"金属（人工骨頭）"],[150,126,234,80,"黒いストリーク"],[150,140,234,190,"白いストリーク"]]}],
+  sx:["人工関節、歯科金属、クリップ、ペースメーカーのリードなど"],
+  ct:["金属から放射状に広がる白・黒の筋","周囲の臓器・病変が評価できなくなる"],
+  mri:["MRI では信号欠損と画像のゆがみ（磁化率アーチファクト）"],
+  tech:["金属アーチファクト低減処理（MAR）の再構成を使う","管電圧を上げる、金属が入らないようにガントリ角度や体位を工夫","デュアルエナジー CT の仮想単色X線画像（高keV）"],
+  rep:["アーチファクトで評価できない領域があることを伝える"],
+  ddx:["実際の病変（ガス、出血）"]
+});
+
+C({id:"art-bh", name:"ビームハードニング（CT）", reg:"アーチファクト", sev:"rout", alias:"線質硬化 後頭蓋窩 Hounsfield bar",
+  keys:[],
+  v:[{tpl:"head-post",m:"CT",wl:W.brain,cap:"両側の錐体骨の間（橋のあたり）に黒い帯状の影。橋の病変と間違えないように。",
+      les:`<path d="M100 116 L140 116" stroke="#000" stroke-width="9" opacity="0.5"/><path d="M96 120 L144 132" stroke="#000" stroke-width="2" opacity="0.5"/>`,
+      ann:[[120,116,234,90,"錐体骨の間の黒い帯"]]}],
+  sx:["厚い骨に挟まれた部位（後頭蓋窩、肩の高さの縦隔、骨盤）"],
+  ct:["X線が硬くなり（低エネルギー成分が吸収され）CT 値が実際より低く計算される","骨に挟まれた部位の黒い帯、カッピング"],
+  mri:["MRI では生じない（後頭蓋窩の評価は MRI が得意）"],
+  tech:["ビームハードニング補正のある再構成関数","薄いスライス、両腕を挙上（胸腹部）、適切な管電圧"],
+  rep:["病変との区別が難しい場合は伝える"],
+  ddx:["橋梗塞・出血","小脳病変"]
+});
+
+C({id:"art-motion", name:"体動アーチファクト（MRI）", reg:"アーチファクト", sev:"rout", alias:"モーション ゴースト 位相方向",
+  keys:[],
+  v:[{tpl:"head-vent",m:"T2",wl:"T2強調像",cap:"頭が動いたため、頭の輪郭が位相エンコード方向（上下）に何重にもずれて写っています（ゴースト）。",
+      les:`${[-26,26,-52,52].map(d=>`<ellipse cx="120" cy="${120+d}" rx="88" ry="102" fill="none" stroke="#fff" stroke-width="5" opacity="${Math.abs(d)>30?0.12:0.22}"/>`).join("")}`,
+      ann:[[120,46,234,24,"輪郭のゴースト"]]}],
+  sx:["意識障害、不穏、痛み、小児、呼吸・心拍、嚥下"],
+  ct:["CT でも短時間の体動で二重像・ぼけ"],
+  mri:["位相エンコード方向にのみゴーストが出る（周波数方向には出ない）","呼吸・拍動・嚥下・血流でも生じる"],
+  tech:["固定具・声かけ・撮像時間の短縮（パラレルイメージング、加算回数の調整）","体動補正シーケンス（PROPELLER/BLADE など）","位相方向を変えて病変にゴーストがかからないようにする","呼吸同期・心電同期"],
+  rep:["診断に支障が出る場合は再撮像の要否を医師と相談"],
+  ddx:["実際の病変"]
+});
+
+C({id:"art-susc", name:"磁化率アーチファクト（MRI）", reg:"アーチファクト", sev:"rout", alias:"金属 歯科 空気 EPI DWI",
+  keys:[],
+  v:[{tpl:"head-vent",m:"DWI",wl:"DWI（EPI）",cap:"歯科金属や副鼻腔の空気の近くで、信号が抜けて黒くなり、周囲が明るくゆがんでいます。拡散強調像（EPI）で特に強く出ます。",
+      les:`<ellipse cx="120" cy="38" rx="36" ry="20" fill="#000"/><path d="M84 52 Q120 74 156 52" stroke="#e8e8e8" stroke-width="5" fill="none"/>`,
+      ann:[[120,38,234,20,"信号欠損"],[140,62,234,60,"明るくゆがむ縁"]]}],
+  sx:["歯科金属、手術クリップ、副鼻腔・乳突蜂巣の空気、出血（ヘモジデリン）"],
+  ct:["CT では金属アーチファクトとして見える"],
+  mri:["信号欠損と画像のゆがみ","EPI（DWI）・グラジエントエコー（T2*）で強い","逆に T2*/SWI はこの性質で出血・石灰化を検出する"],
+  tech:["スピンエコー系・高速スピンエコーを選ぶ","エコー時間を短く、バンド幅を広く","DWI はマルチショット EPI や読み出し分割型で軽減"],
+  rep:["病変が隠れる可能性を伝える"],
+  ddx:["出血・石灰化（本物の低信号）"]
+});
+
+C({id:"art-chem", name:"化学シフトアーチファクト（MRI）", reg:"アーチファクト", sev:"rout", alias:"脂肪 水 周波数方向 境界",
+  keys:[],
+  v:[{tpl:"abd-kidney",m:"T2",wl:"T2強調像",cap:"腎臓と周囲脂肪の境界の片側に黒い帯、反対側に白い帯（周波数エンコード方向にずれる）。",
+      les:`<path d="M46 140 Q40 156 50 174" stroke="#000" stroke-width="3" fill="none"/><path d="M80 136 Q88 154 78 172" stroke="#fff" stroke-width="3" fill="none"/><path d="M160 136 Q152 154 162 172" stroke="#000" stroke-width="3" fill="none"/><path d="M194 140 Q200 156 190 174" stroke="#fff" stroke-width="3" fill="none"/>`,
+      ann:[[46,156,6,190,"黒い帯"],[80,154,6,120,"白い帯"]]}],
+  sx:["脂肪と水の境界（腎臓、椎体終板、膀胱、眼窩）"],
+  ct:["CT では生じない"],
+  mri:["脂肪と水の共鳴周波数の差で、脂肪の位置が周波数方向にずれる","高磁場ほど目立つ","Opposed-phase では境界が黒く縁取られる（第2種）"],
+  tech:["受信バンド幅を広げる","脂肪抑制を使う","周波数方向を入れ替える"],
+  rep:["（通常は報告不要）"],
+  ddx:["被膜・境界の病変"]
+});
+
+C({id:"art-alias", name:"折り返しアーチファクト（MRI）", reg:"アーチファクト", sev:"rout", alias:"エイリアシング FOV ラップアラウンド",
+  keys:[],
+  v:[{tpl:"head-vent",m:"T2",wl:"T2強調像",cap:"撮像範囲（FOV）の外にある後頭部が、画像の反対側（前方）に折り返して重なっています。",
+      les:`<path d="M70 6 Q120 34 170 6" stroke="#9a9a9a" stroke-width="5" fill="none" opacity="0.7"/><path d="M84 10 Q120 26 156 10" stroke="#6a6a6a" stroke-width="4" fill="none" opacity="0.7"/>`,
+      ann:[[120,20,234,40,"折り返した後頭部"]]}],
+  sx:["FOV を小さくしたとき、腕・肩・腹部などが範囲外にはみ出したとき"],
+  ct:["CT では生じない"],
+  mri:["位相エンコード方向に、範囲外の構造が反対側に重なる"],
+  tech:["FOV を広げる、位相方向オーバーサンプリング（no phase wrap）","位相方向を体の短い方向に設定","範囲外の信号を抑える（飽和パルス、コイル選択）"],
+  rep:["（通常は報告不要）"],
+  ddx:["実際の病変"]
+});
+
+</script>
+<script>/* data-chest.js */
+/* 胸部 */
+const EFF_R = "M27 126 Q30 170 70 180 Q96 180 110 166 Q80 166 56 156 Q36 146 30 120Z";
+const EFF_L = mirrorX(EFF_R);
+const PULM = {aorta:"#9e9e9e", pa:"#efefef"};
+
+C({id:"dissection-a", name:"急性大動脈解離（Stanford A型）", reg:"胸部", sev:"crit", alias:"大動脈解離 A型 上行 偽腔 フラップ",
+  keys:["胸痛","背部痛","失神","片麻痺・脱力","ショック・血圧低下","高血圧"],
+  v:[{tpl:"chest",m:"CTC",wl:W.med,cap:"上行大動脈と下行大動脈の両方に内膜フラップがあり、真腔と偽腔に分かれています。上行に解離が及ぶため A 型です。",
+      les:`<path d="M93 102 Q108 120 124 102 A17 17 0 0 0 93 102Z" fill="#a9a9a9"/><path d="M93 102 Q108 120 124 102" stroke="#2c2c2c" stroke-width="2.2" fill="none"/><path d="M135 152 Q146 166 158 157 A13 13 0 0 0 135 152Z" fill="#a9a9a9"/><path d="M135 152 Q146 166 158 157" stroke="#2c2c2c" stroke-width="2.2" fill="none"/>`,
+      ann:[[108,112,6,120,"上行大動脈の内膜フラップ"],[150,162,234,206,"下行大動脈のフラップ"],[110,98,6,24,"偽腔"]]}],
+  sx:["突然の激しい胸痛・背部痛、痛みが移動する","血圧の左右差、失神、意識障害、片麻痺、対麻痺、腹痛（分枝の血流障害）"],
+  ct:["単純CT：内膜石灰化の内側への偏位、偽腔閉塞型では三日月状の高吸収","造影CT：内膜フラップ、真腔と偽腔、エントリー","Stanford A（上行大動脈に及ぶ）→ 緊急手術の対象となることが多い","心嚢液（タンポナーデ）、冠動脈・頸部分枝・腹部分枝への進展"],
+  mri:["急性期は撮像時間と患者管理の点から CT が第一選択"],
+  tech:["単純＋造影（動脈相、必要に応じて遅延相）が基本","上行大動脈は拍動でフラップ様のアーチファクトが出る → 心電図同期撮影が有効","撮像範囲は頸部〜鼠径部（分枝と治療アクセス経路の評価）","右腕からの注入は左腕頭静脈の高濃度造影剤による弓部のアーチファクトを減らせる"],
+  rep:["上行大動脈のフラップ（A型）","心嚢液貯留","分枝（冠動脈・頸動脈・腸間膜動脈など）の灌流障害"],
+  ddx:["急性冠症候群","肺血栓塞栓症","大動脈壁内血腫、穿通性潰瘍","拍動アーチファクト（上行大動脈）"],
+  techQ:{q:"大動脈解離疑いの造影CTで、上行大動脈に線状影が見えるが心拍動の影響も疑われる。有効な対策は？",opts:["心電図同期撮影を行う","ウィンドウ幅を狭くして観察する","撮像範囲を胸部だけに絞る","造影剤の注入速度を下げる"],a:0,
+    exp:"上行大動脈基部は拍動の影響を受けやすく、偽のフラップが出ることがあります。心電図同期で動きを抑えると、真のフラップとの区別がつきやすくなります。"},
+  repQ:{q:"造影CTで上行大動脈に内膜フラップがあり、心嚢液も貯留している。最も適切な対応は？",opts:["A型解離とタンポナーデのリスクとして即座に医師へ伝え、患者のそばを離れない","撮影を終えてから報告書にまとめる","下行大動脈に及んでいないか確認できるまで伝えない","患者に起き上がってもらい楽な姿勢をとらせる"],a:0,
+    exp:"A型解離は急変しうる病態です。速やかな共有と、撮影中の患者観察（血圧・意識）が重要です。"}
+});
+
+C({id:"dissection-b", name:"急性大動脈解離（Stanford B型）", reg:"胸部", sev:"crit", alias:"大動脈解離 B型 下行",
+  keys:["背部痛","胸痛","腹痛（腹部全体）","高血圧"],
+  v:[{tpl:"chest",m:"CTC",wl:W.med,cap:"上行大動脈は正常で、下行大動脈だけにフラップ。B 型は降圧などの保存的治療が多いが、合併症があれば血管内治療。",
+      les:`<path d="M135 152 Q146 166 158 157 A13 13 0 0 0 135 152Z" fill="#a9a9a9"/><path d="M135 152 Q146 166 158 157" stroke="#2c2c2c" stroke-width="2.2" fill="none"/>`,
+      ann:[[150,162,234,206,"下行大動脈のフラップ"],[100,108,6,96,"上行大動脈は正常"]]}],
+  sx:["背部痛（肩甲骨の間）が中心のことが多い","腹部臓器・下肢の虚血、対麻痺"],
+  ct:["下行大動脈の内膜フラップ","腹部分枝（腸間膜動脈・腎動脈）が真腔・偽腔どちらから出ているか","破裂・急速拡大・臓器虚血は合併症（complicated）"],
+  mri:["慢性期の経過観察に用いることがある"],
+  tech:["腹部・腸骨動脈まで連続して撮る","腸管・腎臓の造影不良を確認できるよう遅延相も考慮"],
+  rep:["臓器虚血（腸管・腎臓の造影不良）、破裂所見"],
+  ddx:["A型解離（上行の評価を確実に）","壁内血腫","穿通性潰瘍"]
+});
+
+C({id:"taa", name:"胸部大動脈瘤（切迫破裂）", reg:"胸部", sev:"crit", alias:"大動脈瘤 破裂 crescent sign",
+  keys:["胸痛","背部痛","ショック・血圧低下","無症状（偶然発見）","高齢者"],
+  v:[{tpl:"chest",m:"CT",wl:W.med,cap:"下行大動脈の瘤化と壁在血栓。血栓内の三日月状の高吸収（hyperattenuating crescent sign）は切迫破裂の徴候。左胸水。",
+      les:`<circle cx="152" cy="156" r="26" fill="#6e6e6e"/><circle cx="146" cy="152" r="16" fill="#8a8a8a"/><path d="M168 138 Q182 156 168 176" stroke="#c8c8c8" stroke-width="4" fill="none"/><path d="${EFF_L}" fill="{fluid}"/>`,
+      ann:[[146,152,234,206,"拡張した大動脈"],[175,157,234,150,"高吸収の三日月（切迫破裂）"],[190,170,234,226,"胸水"]]}],
+  sx:["多くは無症状（健診・他疾患の CT で発見）","胸背部痛の出現は切迫破裂のサイン","嗄声、嚥下困難（圧迫）"],
+  ct:["単純CTでの壁在血栓内の三日月状高吸収（切迫破裂）","瘤周囲の脂肪織濃度上昇、胸水・縦隔血腫（破裂）","最大短径の測定"],
+  mri:["待機的な評価で用いることがある"],
+  tech:["単純CTを必ず撮る（三日月状高吸収は造影で分かりにくい）","造影は動脈相で、瘤の範囲と分枝を評価"],
+  rep:["切迫破裂・破裂の所見","以前より急な拡大"],
+  ddx:["大動脈解離（偽腔閉塞型）","壁内血腫"]
+});
+
+C({id:"pe", name:"急性肺血栓塞栓症", reg:"胸部", sev:"crit", alias:"PE 肺塞栓 DVT 騎乗血栓 右心負荷",
+  keys:["呼吸困難","胸痛","失神","ショック・血圧低下","咳・痰","喀血"],
+  v:[{tpl:"chest",m:"CTC",o:PULM,label:"肺動脈CTA",wl:W.pa,cap:"肺動脈分岐部にまたがる造影欠損（騎乗血栓）と、右肺動脈内の欠損。",
+      les:`<path d="M136 100 L92 110" stroke="#efefef" stroke-width="14" stroke-linecap="round"/><path d="M140 98 L172 112" stroke="#efefef" stroke-width="12" stroke-linecap="round"/><ellipse cx="134" cy="102" rx="11" ry="5" fill="#707070"/><ellipse cx="104" cy="107" rx="8" ry="4" fill="#707070"/>`,
+      ann:[[134,102,234,40,"騎乗血栓（造影欠損）"],[104,107,6,40,"右肺動脈の欠損"]]},
+     {tpl:"chest-heart",m:"CTC",o:{rv:"#efefef",lv:"#a4a4a4",aorta:"#9e9e9e"},label:"心臓レベル",wl:W.pa,cap:"右心室が拡大し（RV/LV > 1）、心室中隔が左室側へ偏位。右心負荷の所見です。",
+      les:`<ellipse cx="102" cy="106" rx="32" ry="26" fill="#efefef"/><ellipse cx="156" cy="128" rx="12" ry="12" fill="#a4a4a4"/>`,
+      ann:[[96,104,6,50,"拡大した右心室"],[156,128,234,94,"小さな左心室"],[138,118,234,60,"中隔の平坦化・偏位"]]}],
+  sx:["突然の呼吸困難、胸痛、頻呼吸、頻脈、失神","低酸素血症","リスク：長期臥床、手術後、悪性腫瘍、下肢静脈血栓（DVT）、経口避妊薬など"],
+  ct:["肺動脈内の造影欠損（急性期は血管中心性、辺縁が鋭角）","騎乗血栓（主肺動脈分岐部にまたがる）","右心負荷：右室拡大（RV/LV > 1.0）、中隔の左室側偏位、下大静脈への造影剤逆流","肺梗塞（胸膜に接する楔状影）"],
+  mri:["急性期の評価は CT が第一選択"],
+  tech:["肺動脈相のタイミングが命：主肺動脈に ROI を置いたボーラストラッキングなど","深吸気で強くいきむと下大静脈から非造影血が流入し、偽の造影不良が起こりうる → 軽い吸気で息止め","DVT 評価のため下肢静脈相を追加することがある（施設プロトコルに従う）","呼吸困難の患者は息止めが難しい：短い撮影時間・声かけの工夫"],
+  rep:["騎乗血栓、主肺動脈〜葉動脈の大きな欠損","右心負荷所見（RV/LV > 1）","撮影中の SpO2 低下や意識の変化"],
+  ddx:["造影タイミング不良・呼吸による偽の欠損","肺動脈肉腫","急性冠症候群、大動脈解離"],
+  techQ:{q:"肺動脈CTAで偽の造影不良（transient interruption of contrast）の原因になりうる息止め方法は？",opts:["深く吸ってから強くいきむ（バルサルバ）","軽く吸って止める","息を吐いた状態で止める","短時間の撮影で浅く息止めする"],a:0,
+    exp:"強いいきみで胸腔内圧が変わると、下大静脈からの非造影血が右心系に流れ込み、肺動脈の造影が一時的に薄くなることがあります。"},
+  repQ:{q:"肺動脈CTAで主肺動脈分岐部にまたがる造影欠損と右室拡大（RV/LV > 1）を認めた。最も適切な対応は？",opts:["騎乗血栓と右心負荷として、急変に備えつつ直ちに医師へ伝える","下肢静脈相まですべて撮り終えてから伝える","偽の欠損の可能性が高いので再撮影する","患者を歩いて病棟に戻す"],a:0,
+    exp:"右心負荷を伴う広範な肺塞栓はショックに移行しうるため、速やかな共有と患者の安静・観察が必要です。"}
+});
+
+C({id:"ptx", name:"気胸（緊張性気胸を含む）", reg:"胸部", sev:"crit", alias:"気胸 自然気胸 緊張性 ブラ",
+  keys:["胸痛","呼吸困難","胸部外傷","ショック・血圧低下"],
+  v:[{tpl:"chest-lung",m:"CTL",wl:W.lung,cap:"右胸腔に空気（真っ黒）がたまり、肺が内側にしぼんでいます。肺の縁に細い胸膜の線。",
+      les:p=>ring([70,118,44,62],[84,120,28,46],"#000")+`<ellipse cx="84" cy="120" rx="28" ry="46" fill="none" stroke="${p.soft}" stroke-width="0.9"/>`,
+      ann:[[44,110,6,60,"胸腔内の空気"],[56,120,6,140,"しぼんだ肺の縁（胸膜線）"]]}],
+  sx:["突然の胸痛・呼吸困難","若いやせ型男性（自然気胸）、COPD、外傷","緊張性気胸：急速な呼吸・循環の悪化、頸静脈怒張"],
+  ct:["胸腔内の空気と臓側胸膜の線","緊張性：縦隔の対側偏位、横隔膜の平低化","ブラ、外傷では肋骨骨折・皮下気腫"],
+  mri:["通常行わない"],
+  tech:["肺野条件で観察（縦隔条件では気胸が見えにくい）","仰臥位では空気は前方にたまる：前胸部をよく見る","緊張性気胸は画像より処置が優先（撮影中の急変に注意）"],
+  rep:["気胸の存在（特に人工呼吸中、外傷）","縦隔偏位（緊張性を疑う）"],
+  ddx:["巨大ブラ","皮膚のしわ・衣服によるライン（X線）"],
+  repQ:{q:"外傷患者の胸部CTで、右胸腔の前方に空気があり縦隔が左へ偏位している。最も適切な対応は？",opts:["緊張性気胸の可能性として直ちに医師へ伝え、患者の呼吸・循環を観察する","肺野条件では見えないので問題ないと判断する","残りの部位をすべて撮り終えてから伝える","患者に深呼吸を繰り返してもらう"],a:0,
+    exp:"緊張性気胸は数分で循環が破綻しうる病態です。画像診断より処置が優先されるため、すぐに共有します。"}
+});
+
+C({id:"hemothorax", name:"血胸", reg:"胸部", sev:"crit", alias:"外傷性血胸 胸腔内出血",
+  keys:["胸部外傷","呼吸困難","ショック・血圧低下","胸痛","高エネルギー外傷"],
+  v:[{tpl:"chest-lung",m:"CT",wl:W.med,cap:"右胸腔の背側に、通常の胸水より CT 値の高い液体貯留（血液）。",
+      les:`<path d="${EFF_R}" fill="#8e8e8e"/><path d="M40 150 Q70 170 104 164" stroke="#b0b0b0" stroke-width="2" fill="none"/>`,
+      ann:[[60,166,6,206,"高吸収の胸水（血液）"]]}],
+  sx:["胸部外傷後の呼吸困難、ショック","大動脈瘤破裂、抗凝固療法中、胸腔ドレーン・穿刺後"],
+  ct:["胸水の CT 値が高い（およそ 35 HU 以上）、液面形成（ヘマトクリット効果）","造影で活動性出血（造影剤漏出）","肋骨骨折、肺挫傷の合併"],
+  mri:["通常行わない"],
+  tech:["CT 値を測る（ROI）","動脈相で出血源（肋間動脈など）を評価"],
+  rep:["大量血胸、造影剤の血管外漏出"],
+  ddx:["胸水","膿胸"]
+});
+
+C({id:"rib-fx", name:"多発肋骨骨折・肺挫傷", reg:"胸部", sev:"urg", alias:"肋骨骨折 フレイルチェスト 肺挫傷 皮下気腫",
+  keys:["胸部外傷","胸痛","呼吸困難","高エネルギー外傷","転倒","喀血"],
+  v:[{tpl:"chest-lung",m:"CTL",wl:W.lung,cap:"右肋骨の骨折とずれ、すぐ内側の肺にすりガラス〜浸潤影（肺挫傷）、胸壁に皮下気腫。",
+      les:`<path d="M27 92 L34 100" stroke="#000" stroke-width="2.2"/><ellipse cx="50" cy="100" rx="14" ry="18" fill="#7a7a7a"/><ellipse cx="46" cy="96" rx="7" ry="9" fill="#a8a8a8"/>${[[14,104],[16,112],[18,96],[20,120]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="2" fill="#000"/>`).join("")}`,
+      ann:[[30,96,6,60,"肋骨骨折"],[52,104,6,150,"肺挫傷"],[17,110,6,200,"皮下気腫"]]}],
+  sx:["胸部打撲後の痛み、呼吸で痛む","多発骨折で胸壁が奇異呼吸（フレイルチェスト）","高齢者は肋骨骨折だけでも呼吸器合併症が多い"],
+  ct:["骨折の数・ずれ、フレイル部分","肺挫傷（区域に一致しないすりガラス〜浸潤影）、肺裂傷（空洞・血腫）","気胸・血胸の合併"],
+  mri:["通常行わない"],
+  tech:["骨条件・3D 再構成（肋骨展開像など）で骨折を数える","肺野条件で気胸・挫傷を確認"],
+  rep:["気胸・血胸の合併","第1〜3肋骨骨折（大血管損傷を考慮）"],
+  ddx:["誤嚥による陰影","古い骨折"]
+});
+
+C({id:"lobar-pneumonia", name:"大葉性肺炎", reg:"胸部", sev:"urg", alias:"肺炎 肺炎球菌 air bronchogram",
+  keys:["発熱","咳・痰","呼吸困難","胸痛"],
+  v:[{tpl:"chest-lung",m:"CTL",wl:W.lung,cap:"右下葉に葉間裂で境される浸潤影。内部に空気を含む気管支が黒く抜ける（air bronchogram）。",
+      les:`<path d="M38 150 Q66 110 96 92 L104 150 Q90 178 66 178 Q42 172 38 150Z" fill="#c0c0c0"/><path d="M96 108 L76 140 M84 124 L66 150 M82 130 L88 158" stroke="#000" stroke-width="1.6"/>`,
+      ann:[[70,150,6,206,"浸潤影"],[80,134,6,120,"air bronchogram"]]}],
+  sx:["発熱、咳、膿性痰、呼吸困難、胸痛"],
+  ct:["区域・肺葉に広がる浸潤影、air bronchogram","葉間裂で境される","胸水、膿胸、膿瘍の合併"],
+  mri:["通常行わない"],
+  tech:["肺野条件・縦隔条件の両方で再構成","咳込みで息止めが難しい：短時間撮影"],
+  rep:["膿胸・肺膿瘍の合併、広範な陰影（呼吸状態の悪化）"],
+  ddx:["閉塞性肺炎（肺癌）","肺胞出血","器質化肺炎"]
+});
+
+C({id:"aspiration", name:"誤嚥性肺炎", reg:"胸部", sev:"urg", alias:"誤嚥 嚥下障害 背側",
+  keys:["発熱","咳・痰","呼吸困難","高齢者","嚥下困難・流涎"],
+  v:[{tpl:"chest-lung",m:"CTL",wl:W.lung,cap:"両側の背側（重力のかかる部分）に浸潤影とすりガラス影。",
+      les:`<ellipse cx="74" cy="166" rx="22" ry="12" fill="#6a6a6a"/><ellipse cx="74" cy="168" rx="15" ry="8" fill="#b8b8b8"/><ellipse cx="166" cy="166" rx="18" ry="11" fill="#6a6a6a"/><ellipse cx="166" cy="168" rx="11" ry="7" fill="#b8b8b8"/>`,
+      ann:[[74,168,6,206,"背側の浸潤影"],[166,168,234,206,"反対側にも"]]}],
+  sx:["高齢者、脳血管障害後、意識障害、嚥下障害","発熱がはっきりしないこともある","食事中のむせ、夜間の不顕性誤嚥"],
+  ct:["重力のかかる部位（仰臥位では下葉背側、上葉後区）","気管支壁肥厚、気道内の分泌物","右側に多い"],
+  mri:["通常行わない"],
+  tech:["仰臥位で撮るので背側優位の分布になる","撮影中の嘔吐・誤嚥に注意（体位・吸引の準備）"],
+  rep:["気道内の異物・大量の分泌物"],
+  ddx:["心不全（背側の無気肺・胸水）","肺挫傷"]
+});
+
+C({id:"ip", name:"間質性肺炎（急性増悪）", reg:"胸部", sev:"crit", alias:"特発性肺線維症 IPF UIP 蜂巣肺 急性増悪",
+  keys:["呼吸困難","咳・痰","発熱","高齢者"],
+  v:[{tpl:"chest-lung",m:"CTL",wl:W.lung,cap:"両側の胸膜直下・背側に蜂巣肺（小さな嚢胞の集まり）と網状影。急性増悪では新たに広いすりガラス影が加わります。",
+      les:`<ellipse cx="70" cy="118" rx="40" ry="56" fill="#5c5c5c" opacity="0.8"/><ellipse cx="170" cy="118" rx="40" ry="56" fill="#5c5c5c" opacity="0.8"/>${[[34,140],[40,152],[48,164],[30,128],[56,172],[206,140],[200,152],[192,164],[210,128],[184,172]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="3.4" fill="#000" stroke="#c6c6c6" stroke-width="1.2"/>`).join("")}`,
+      ann:[[40,152,6,200,"蜂巣肺（胸膜直下）"],[80,110,6,60,"新たなすりガラス影"]]}],
+  sx:["慢性の息切れ、乾いた咳、ばち指","急性増悪：数日〜1か月で急に呼吸困難が悪化"],
+  ct:["UIP パターン：下葉・胸膜直下優位の網状影と蜂巣肺、牽引性気管支拡張","急性増悪：両側の新たなすりガラス影・浸潤影"],
+  mri:["通常行わない"],
+  tech:["薄いスライス（1mm 前後）・高分解能再構成","背側の重力効果（仰臥位）と区別するため腹臥位撮影を追加することがある","低酸素で息止めが難しい：短時間撮影"],
+  rep:["急性増悪を疑う新たなすりガラス影","気胸・縦隔気腫の合併"],
+  ddx:["心不全","感染症（ニューモシスチス肺炎など）","薬剤性肺障害"]
+});
+
+C({id:"viral-pneumonia", name:"ウイルス性肺炎（COVID-19 など）", reg:"胸部", sev:"urg", alias:"COVID-19 新型コロナ すりガラス影 GGO",
+  keys:["発熱","咳・痰","呼吸困難"],
+  v:[{tpl:"chest-lung",m:"CTL",wl:W.lung,cap:"両側の胸膜直下に多発するすりガラス影（GGO）。",
+      les:`${[[40,110,10,20],[58,160,14,10],[62,70,12,8],[200,104,10,20],[184,160,14,10],[176,72,12,8]].map(([x,y,a,b])=>`<ellipse cx="${x}" cy="${y}" rx="${a}" ry="${b}" fill="#707070"/>`).join("")}`,
+      ann:[[40,110,6,96,"胸膜直下のすりガラス影"],[200,104,234,96,"両側に多発"]]}],
+  sx:["発熱、咳、倦怠感、呼吸困難","味覚・嗅覚障害（COVID-19）"],
+  ct:["両側・末梢優位の多発すりガラス影","進行すると浸潤影・crazy-paving","回復期に器質化"],
+  mri:["通常行わない"],
+  tech:["施設の感染対策（ゾーニング、清拭、換気）に従う","撮影後の装置・寝台の消毒"],
+  rep:["広範な陰影（重症化）"],
+  ddx:["細菌性肺炎","薬剤性肺障害","心不全"]
+});
+
+C({id:"tb", name:"肺結核", reg:"胸部", sev:"urg", alias:"結核 空洞 tree-in-bud 感染対策",
+  keys:["咳・痰","発熱","体重減少","喀血","免疫低下・糖尿病","高齢者"],
+  v:[{tpl:"chest-lung",m:"CTL",wl:W.lung,cap:"右上葉の厚い壁の空洞と、周囲の小葉中心性の粒状影（tree-in-bud）。",
+      les:`<circle cx="56" cy="84" r="11" fill="#000" stroke="#c6c6c6" stroke-width="3.5"/>${[[74,96],[78,102],[84,98],[70,108],[86,108],[64,62],[70,58]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="1.8" fill="#c6c6c6"/>`).join("")}<path d="M74 96 L80 100 L86 108" stroke="#c6c6c6" stroke-width="0.8" fill="none"/>`,
+      ann:[[56,84,6,40,"厚い壁の空洞"],[80,102,6,120,"tree-in-bud"]]}],
+  sx:["2週間以上続く咳・痰、微熱、寝汗、体重減少、血痰","高齢者、糖尿病、免疫抑制、透析"],
+  ct:["上葉（S1, S2）・下葉 S6 に好発","空洞、小葉中心性粒状影、tree-in-bud","リンパ節腫大、胸水"],
+  mri:["通常行わない"],
+  tech:["疑いの段階から空気感染対策（N95 マスク、検査順の調整、換気）","撮影後の室内換気・清拭は施設ルールに従う"],
+  rep:["結核を疑う所見（空洞・tree-in-bud）は感染対策のため早めに共有"],
+  ddx:["非結核性抗酸菌症","肺癌","肺膿瘍"]
+});
+
+C({id:"lung-ca", name:"肺癌", reg:"胸部", sev:"rout", alias:"肺腺癌 結節 スピキュラ 胸膜陥入",
+  keys:["咳・痰","喀血","体重減少","無症状（偶然発見）"],
+  v:[{tpl:"chest-lung",m:"CTL",wl:W.lung,cap:"左上葉の辺縁が不整でとげ状（スピキュラ）の結節と、胸膜を引き込む線（胸膜陥入）。",
+      les:`<circle cx="182" cy="88" r="9" fill="#c6c6c6"/><path d="M182 79 L184 70 M190 84 L198 80 M190 94 L196 100 M176 82 L170 76 M174 94 L168 98" stroke="#c6c6c6" stroke-width="1.2"/><path d="M190 88 Q202 82 212 84" stroke="#c6c6c6" stroke-width="1" fill="none"/>`,
+      ann:[[182,88,234,40,"スピキュラを伴う結節"],[204,84,234,110,"胸膜陥入"]]}],
+  sx:["初期は無症状（健診で発見）","咳、血痰、体重減少、嗄声"],
+  ct:["スピキュラ、胸膜陥入、血管収束、分葉状","すりガラス成分を含む結節（腺癌）","リンパ節・骨・副腎・脳への転移"],
+  mri:["脳転移の検索に造影 MRI"],
+  tech:["薄いスライス・高分解能再構成で結節の性状を評価","経過観察は同じ条件（線量・スライス厚・再構成関数）で比較"],
+  rep:["（通常は待機的）大量胸水、上大静脈症候群など"],
+  ddx:["結核腫","器質化肺炎","過誤腫"]
+});
+
+C({id:"copd", name:"肺気腫（COPD）", reg:"胸部", sev:"rout", alias:"COPD 慢性閉塞性肺疾患 喫煙 低吸収域",
+  keys:["呼吸困難","咳・痰","無症状（偶然発見）","高齢者"],
+  v:[{tpl:"chest-lung",m:"CTL",wl:W.lung,cap:"両肺上部に壁のない黒い領域（低吸収域）が多発しています。",
+      les:`${[[50,80,5],[64,70,4],[76,88,6],[44,104,4],[62,98,3],[88,72,4],[176,80,5],[190,70,4],[164,92,6],[196,104,4],[178,100,3],[152,74,4]].map(([x,y,r])=>`<circle cx="${x}" cy="${y}" r="${r}" fill="#000"/>`).join("")}`,
+      ann:[[76,88,6,40,"壁のない低吸収域"],[164,92,234,40,"上葉優位"]]}],
+  sx:["喫煙歴、労作時の息切れ、慢性の咳・痰","急性増悪で呼吸困難が悪化"],
+  ct:["壁のない低吸収域（小葉中心性・汎小葉性）","上葉優位（喫煙）","ブラ、気胸の合併"],
+  mri:["通常行わない"],
+  tech:["肺野条件で観察","CO2 がたまりやすい患者もいる：酸素投与量は医師の指示どおりに"],
+  rep:["気胸の合併"],
+  ddx:["肺嚢胞性疾患（LAM など、壁がある）","蜂巣肺"]
+});
+
+C({id:"pulm-edema", name:"心原性肺水腫", reg:"胸部", sev:"crit", alias:"心不全 肺うっ血 butterfly",
+  keys:["呼吸困難","咳・痰","高血圧","高齢者"],
+  v:[{tpl:"chest-lung",m:"CTL",wl:W.lung,cap:"肺門を中心とした両側のすりガラス影（butterfly）、小葉間隔壁の肥厚、両側胸水。",
+      les:`<ellipse cx="94" cy="112" rx="24" ry="32" fill="#6c6c6c"/><ellipse cx="146" cy="112" rx="24" ry="32" fill="#6c6c6c"/><path d="${EFF_R}" fill="#c0c0c0"/><path d="${EFF_L}" fill="#c0c0c0"/>${[[30,80],[34,70],[206,80],[210,92]].map(([x,y])=>`<path d="M${x} ${y} l8 0" stroke="#c6c6c6" stroke-width="1"/>`).join("")}`,
+      ann:[[94,112,6,90,"肺門周囲のすりガラス影"],[34,74,6,40,"小葉間隔壁の肥厚"],[70,172,6,206,"胸水"]]}],
+  sx:["急な呼吸困難、起座呼吸、ピンク色の泡沫状痰","心疾患、高血圧、腎不全・透析患者の体液過剰"],
+  ct:["肺門周囲・両側のすりガラス影、小葉間隔壁の肥厚","両側胸水、心拡大","気管支血管束の肥厚"],
+  mri:["通常行わない"],
+  tech:["仰臥位で呼吸困難が増悪しやすい：撮影時間を短く、上体の角度は医師と相談","息止めが難しい場合は撮影条件で工夫"],
+  rep:["撮影中の呼吸状態の悪化"],
+  ddx:["肺炎（ウイルス性）","ARDS","間質性肺炎の急性増悪"]
+});
+
+C({id:"effusion", name:"胸水", reg:"胸部", sev:"rout", alias:"胸水貯留 無気肺",
+  keys:["呼吸困難","胸痛","咳・痰"],
+  v:[{tpl:"chest-lung",m:"CT",wl:W.med,cap:"両側の背側に三日月状の液体貯留（水に近い CT 値）。隣接する肺は押されて無気肺になっています。",
+      les:`<path d="${EFF_R}" fill="{fluid}"/><path d="${EFF_L}" fill="{fluid}"/><path d="M40 150 Q70 166 104 162" stroke="#8a8a8a" stroke-width="3" fill="none"/>`,
+      ann:[[60,170,6,206,"胸水"],[70,158,6,140,"圧排性無気肺"]]}],
+  sx:["呼吸困難、胸痛、咳","心不全、腎不全、肝硬変、肺炎、悪性腫瘍"],
+  ct:["背側の三日月状の液体（仰臥位）","CT 値：漏出液は水に近い、出血は高い","胸膜の肥厚・結節（悪性・膿胸の示唆）"],
+  mri:["通常行わない"],
+  tech:["CT 値を測定","被包化（動かない）胸水は形がレンズ状"],
+  rep:["大量胸水・縦隔の偏位"],
+  ddx:["血胸","膿胸","胸膜肥厚"]
+});
+
+C({id:"pericardial", name:"心嚢液貯留・心タンポナーデ", reg:"胸部", sev:"crit", alias:"心タンポナーデ 心膜液",
+  keys:["呼吸困難","胸痛","ショック・血圧低下","失神"],
+  v:[{tpl:"chest-heart",m:"CTC",wl:W.med,cap:"心臓の周りを取り囲む液体（心嚢液）。右心室が押されてつぶれ気味です。",
+      les:p=>ring([122,118,68,56],[122,118,56,44],p.fluid)+`<ellipse cx="102" cy="106" rx="18" ry="10" fill="${p.vessel}"/>`,
+      ann:[[122,64,234,24,"心嚢液"],[102,106,6,50,"圧排された右心室"]]}],
+  sx:["呼吸困難、胸痛、頻脈、血圧低下、頸静脈怒張","大動脈解離、心筋梗塞後の破裂、悪性腫瘍、腎不全、カテーテル治療後"],
+  ct:["心臓周囲の液体（CT 値が高ければ血液）","右心系の圧排・虚脱、下大静脈の拡張","原因（解離、腫瘍）の評価"],
+  mri:["待機的な評価で使うことがある"],
+  tech:["急変しうる：撮影中の血圧・意識を観察","原因として大動脈解離を考えて撮像範囲・相を医師と確認"],
+  rep:["心嚢液貯留（特に高吸収・急な出現）"],
+  ddx:["心膜肥厚","心外膜脂肪"]
+});
+
+C({id:"pneumomediastinum", name:"縦隔気腫", reg:"胸部", sev:"urg", alias:"特発性縦隔気腫 皮下気腫",
+  keys:["胸痛","頸部痛","呼吸困難","咽頭痛"],
+  v:[{tpl:"chest",m:"CT",wl:W.med,cap:"大血管や気管・食道のまわりに黒い空気の筋。",
+      les:`<path d="M76 90 Q86 82 98 88 M96 122 Q108 130 124 122 M124 92 Q134 82 150 90 M120 140 Q130 146 136 140 M156 146 Q164 152 162 166" stroke="#000" stroke-width="2.2" fill="none"/>${[[120,70],[126,74]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="2" fill="#000"/>`).join("")}`,
+      ann:[[86,86,6,40,"血管周囲の空気"],[132,140,234,130,"食道周囲の空気"]]}],
+  sx:["胸痛、頸部痛、嚥下痛、頸部の握雪感（皮下気腫）","若年者の激しい咳・嘔吐・運動後（特発性）","喘息、外傷、人工呼吸"],
+  ct:["縦隔内の空気（大血管・気管・食道周囲）","頸部・胸壁の皮下気腫","原因：気管・食道損傷（造影剤漏出、液体貯留を伴うと食道破裂を疑う）"],
+  mri:["通常行わない"],
+  tech:["嘔吐後の発症なら食道破裂を考え、医師と経口造影の要否を相談","肺野条件で観察すると空気が見やすい"],
+  rep:["食道周囲の液体・胸水を伴う場合（食道破裂を疑う）"],
+  ddx:["気胸","食道破裂"]
+});
+
+C({id:"boerhaave", name:"特発性食道破裂", reg:"胸部", sev:"crit", alias:"Boerhaave 嘔吐後 縦隔炎",
+  keys:["胸痛","背部痛","嘔吐・嘔気","呼吸困難","ショック・血圧低下"],
+  v:[{tpl:"chest-heart",m:"CTC",wl:W.med,cap:"食道の周りに空気と液体、左胸水。経口造影剤を使うと食道外への漏れが分かります。",
+      les:`<ellipse cx="128" cy="168" rx="13" ry="10" fill="#5a5a5a"/><circle cx="128" cy="166" r="5" fill="{soft}"/>${[[120,162],[136,172],[134,160],[122,174]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="2.2" fill="#000"/>`).join("")}<circle cx="138" cy="176" r="3" fill="#f0f0f0"/><path d="${EFF_L}" fill="{fluid}"/>`,
+      ann:[[122,162,6,200,"食道周囲の空気と液体"],[138,176,234,226,"造影剤の漏出"],[200,160,234,140,"左胸水"]]}],
+  sx:["飲酒後などの激しい嘔吐に続く胸痛・背部痛","呼吸困難、皮下気腫、ショック"],
+  ct:["食道周囲の空気・液体、縦隔気腫","左胸水（下部食道の左側壁が破れやすい）","経口造影剤の漏出"],
+  mri:["通常行わない"],
+  tech:["経口造影剤（水溶性）の使用は医師の判断・指示で","撮影中も状態が急変しうる"],
+  rep:["食道外への造影剤漏出、縦隔の液体・空気"],
+  ddx:["縦隔気腫（特発性）","大動脈解離","急性冠症候群"]
+});
+
+C({id:"empyema", name:"膿胸", reg:"胸部", sev:"urg", alias:"膿胸 split pleura sign 胸膜炎",
+  keys:["発熱","胸痛","咳・痰","呼吸困難","免疫低下・糖尿病"],
+  v:[{tpl:"chest-lung",m:"CTC",wl:W.med,cap:"右背側のレンズ状の液体貯留。壁側胸膜と臓側胸膜の両方が造影され、液体を挟んで分かれる（split pleura sign）。",
+      les:`<path d="M30 118 Q22 160 70 184 Q58 146 30 118Z" fill="{fluid}" stroke="#d8d8d8" stroke-width="2"/>`,
+      ann:[[36,150,6,206,"レンズ状の液体"],[56,152,6,120,"造影される胸膜（両側）"]]}],
+  sx:["肺炎の経過中に続く発熱、胸痛","高齢者、糖尿病、誤嚥、口腔内衛生不良"],
+  ct:["被包化された（レンズ状の）液体","split pleura sign","ガスを含む場合は気管支胸膜瘻やガス産生菌"],
+  mri:["通常行わない"],
+  tech:["造影CTの撮像タイミングは胸膜が造影される時相（静脈相）で","ドレナージ計画のため範囲を十分に"],
+  rep:["ガスを含む液体貯留"],
+  ddx:["単純な胸水","肺膿瘍（肺の中、壁が厚く球形）"]
+});
+
+</script>
+<script>/* data-abd.js */
+/* 腹部・骨盤 */
+const FREE_AIR = `<path d="M44 84 Q88 54 132 55 Q96 62 56 92Z" fill="#030303"/><circle cx="118" cy="66" r="3" fill="#030303"/><circle cx="125" cy="72" r="2.4" fill="#030303"/><circle cx="112" cy="72" r="2" fill="#030303"/>`;
+const dots = (arr, r, f) => arr.map(([x,y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${f}"/>`).join("");
+
+C({id:"perforation", name:"消化管穿孔（free air）", reg:"腹部・骨盤", sev:"crit", alias:"穿孔 腹腔内遊離ガス 十二指腸潰瘍 腹膜炎",
+  keys:["腹痛（腹部全体）","腹痛（上腹部）","発熱","ショック・血圧低下","嘔吐・嘔気"],
+  v:[{tpl:"abd-upper",m:"CT",wl:W.abd,cap:"肝前面の腹壁直下に黒い領域（腹腔内遊離ガス）。腹部条件では脂肪との区別がつきにくいことがあります。",
+      les:FREE_AIR, ann:[[70,72,6,40,"肝前面の free air"],[122,69,234,40,"肝円索周囲の小気泡"]]},
+     {tpl:"abd-upper",m:"CTL",wl:W.lung,cap:"同じスライスを肺野条件で表示。脂肪が灰色に、ガスだけが黒く見え、少量の free air が目立ちます。",
+      les:FREE_AIR, ann:[[70,72,6,40,"肝前面の free air"],[122,69,234,40,"肝円索周囲の小気泡"]]}],
+  sx:["突然の激しい腹痛、腹部全体の圧痛","筋性防御、板状硬（腹膜刺激症状）","消化性潰瘍・NSAIDs・ステロイドの使用、大腸憩室、内視鏡処置後など"],
+  ct:["腹腔内遊離ガス：肝前面、腹壁直下、肝円索・肝鎌状間膜周囲、肝門部","穿孔部近くの消化管外の小気泡、壁の欠損、周囲の脂肪織濃度上昇","上部（十二指腸潰瘍など）はガスが多めに、下部（大腸）は便汁漏出で重症化しやすい"],
+  mri:["急性腹症の初期評価は CT が基本"],
+  tech:["肺野条件など広いウィンドウで、腹壁直下・肝前面を必ず確認","単純CTでも free air は描出できる。造影の有無は医師の指示に従う","立位胸部X線より CT の方が少量の遊離ガスを検出しやすい"],
+  rep:["腹腔内遊離ガス","腸管外への便・造影剤の漏出","腸管壁内ガス・門脈内ガス（虚血を示唆）"],
+  ddx:["術後・腹腔鏡後の残存ガス","腸管壁内ガス","肺底部・胃内ガスの見誤り"],
+  techQ:{q:"少量の free air を見つけるのに有効な観察方法は？",opts:["肺野条件など広いウィンドウで腹壁直下や肝前面を見る","脳条件（狭いウィンドウ）で見る","骨条件のみで観察する","スライス厚を厚くして再構成する"],a:0,
+    exp:"腹部条件では脂肪もガスも暗く見えるため、ウィンドウを広げるとガスだけが黒く浮き上がり、少量でも気づきやすくなります。"},
+  repQ:{q:"急な腹痛で来院した患者の CT で、肝前面の腹壁直下に少量のガスを認めた。最も適切な対応は？",opts:["消化管外ガス（free air）の可能性として医師に伝える","腸管内のガスと判断して伝えない","造影CTを独自に追加する","後日の読影を待つ"],a:0,
+    exp:"free air は手術を含む緊急対応につながる所見です。造影の追加などは医師の指示で行います。"}
+});
+
+C({id:"strangulation", name:"絞扼性腸閉塞", reg:"腹部・骨盤", sev:"crit", alias:"絞扼 腸閉塞 イレウス whirl closed loop",
+  keys:["腹痛（腹部全体）","嘔吐・嘔気","腹部膨満","ショック・血圧低下"],
+  v:[{tpl:"abd-mid",m:"CTC",wl:W.abd,cap:"拡張した小腸と鏡面形成、腸間膜の渦巻き像（whirl sign）、造影効果の低下した腸管壁、腹水。",
+      les:`${[[64,92,17],[102,72,16],[158,74,17],[184,112,15]].map(([x,y,r])=>`<circle cx="${x}" cy="${y}" r="${r}" fill="#545454" stroke="#bcbcbc" stroke-width="2.6"/>`).join("")}<path d="M48 84 Q64 74 80 84 Z" fill="#000"/><path d="M142 66 Q158 56 174 66 Z" fill="#000"/>${[[82,136,14],[98,170,12]].map(([x,y,r])=>`<circle cx="${x}" cy="${y}" r="${r}" fill="#626262" stroke="#6e6e6e" stroke-width="2.6"/>`).join("")}<path d="M30 116 Q32 160 52 184 Q44 150 40 114Z" fill="#575757"/><circle cx="140" cy="126" r="17" fill="#4c4c4c"/><path d="M140 126 m-2 0 a2 2 0 1 1 4 0 a5 5 0 1 1 -10 0 a8 8 0 1 1 16 0 a11 11 0 1 1 -22 0 a13 13 0 1 1 26 0" stroke="#c6c6c6" stroke-width="2" fill="none"/>`,
+      ann:[[152,124,234,140,"whirl sign"],[90,143,6,214,"造影不良の腸管壁"],[64,82,6,40,"拡張した小腸（鏡面形成）"],[38,150,6,170,"腹水"]]}],
+  sx:["持続する強い腹痛、嘔吐、腹部膨満","開腹手術歴（癒着）、内ヘルニア、鼠径ヘルニアの嵌頓","発熱、頻脈、腹膜刺激症状は進行を示唆"],
+  ct:["closed loop（U字・C字状の拡張腸管）、beak sign","whirl sign（腸間膜血管の渦巻き）","腸管壁の造影効果低下、単純CTで壁の高吸収（出血性梗塞）","腸間膜の浮腫・濃度上昇、腹水、腸管壁内ガス・門脈内ガス"],
+  mri:["急性期の評価は CT が基本"],
+  tech:["単純＋造影（可能ならダイナミック）で腸管壁の造影効果を比べる","冠状断の再構成で閉塞部（移行部）を追う","嘔吐による誤嚥に注意し、吐物への備えをしてから撮影"],
+  rep:["whirl sign、closed loop","腸管壁の造影不良、腹水の増加","腸管壁内ガス・門脈内ガス"],
+  ddx:["単純性（癒着性）腸閉塞","麻痺性イレウス","上腸間膜動脈閉塞症","腸重積"],
+  techQ:{q:"絞扼性腸閉塞の評価で、単純CTに加えて造影CT（ダイナミック）が重要な理由は？",opts:["腸管壁の造影効果低下（血流障害）を評価するため","腸管ガスを消すため","被ばくを減らすため","腹水を目立たなくするため"],a:0,
+    exp:"絞扼では腸管の血流が落ちるため、造影後の壁の染まりが悪くなります。単純CTと比べることで血流障害の判断がしやすくなります。"},
+  repQ:{q:"腹痛と嘔吐の患者。CTで拡張した小腸ループと腸間膜の渦巻き状の構造（whirl sign）を認めた。最も適切な対応は？",opts:["捻転・絞扼の可能性として直ちに医師に伝える","単純性の腸閉塞と判断して伝えない","便秘の所見として患者に説明する","翌日に再検査を予定する"],a:0,
+    exp:"絞扼は時間とともに腸管壊死が進み、緊急手術が必要になることがあります。早期の共有が大切です。"}
+});
+
+C({id:"sbo", name:"癒着性（単純性）小腸閉塞", reg:"腹部・骨盤", sev:"urg", alias:"腸閉塞 イレウス 癒着 small bowel feces",
+  keys:["腹痛（腹部全体）","嘔吐・嘔気","腹部膨満"],
+  v:[{tpl:"abd-mid",m:"CTC",wl:W.abd,cap:"小腸が拡張し（径 2.5〜3cm 以上）、液面形成。閉塞部より口側の腸内容が便のように見える（small bowel feces sign）。大腸はしぼんでいます。",
+      les:`${[[64,92,17],[100,74,16],[156,76,17],[182,112,15],[86,126,15]].map(([x,y,r])=>`<circle cx="${x}" cy="${y}" r="${r}" fill="#545454" stroke="#bcbcbc" stroke-width="2.2"/>`).join("")}<path d="M48 84 Q64 74 80 84Z" fill="#000"/><path d="M140 68 Q156 58 172 68Z" fill="#000"/><circle cx="86" cy="126" r="11" fill="#6a6a6a"/>${dots([[82,122],[90,128],[86,132]],1.6,"#000")}<circle cx="42" cy="130" r="8" fill="#555" stroke="{soft}" stroke-width="2"/><circle cx="200" cy="134" r="6" fill="#555" stroke="{soft}" stroke-width="2"/>`,
+      ann:[[64,82,6,40,"拡張した小腸・液面"],[86,126,6,170,"small bowel feces sign"],[200,134,234,160,"しぼんだ大腸"]]}],
+  sx:["腹痛（波のある痛み）、嘔吐、排ガス・排便の停止","開腹手術歴"],
+  ct:["小腸の拡張と液面形成、移行部（拡張と虚脱の境目）","small bowel feces sign は閉塞部の近くに見られやすい","絞扼所見（造影不良、腹水、whirl）がないかを確認"],
+  mri:["通常は CT"],
+  tech:["冠状断で移行部を探す","嘔吐に備え、イレウス管が入っている場合は先端位置も確認できる範囲で"],
+  rep:["絞扼を疑う所見（造影不良、whirl、腹水増加）"],
+  ddx:["絞扼性腸閉塞","麻痺性イレウス（大腸も拡張）","閉鎖孔ヘルニアなどの嵌頓"]
+});
+
+C({id:"appendicitis", name:"急性虫垂炎", reg:"腹部・骨盤", sev:"urg", alias:"虫垂炎 糞石 McBurney",
+  keys:["腹痛（右下腹部）","腹痛（上腹部）","発熱","嘔吐・嘔気"],
+  v:[{tpl:"abd-low",m:"CTC",wl:W.abd,cap:"虫垂が腫大（径 6mm 超）し、壁が造影され、根部に高吸収の糞石。周囲の脂肪が毛羽立っています。",
+      les:`<ellipse cx="80" cy="134" rx="18" ry="22" fill="#4e4e4e"/><g transform="rotate(-25 78 134)"><ellipse cx="78" cy="136" rx="7" ry="14" fill="{fluid}" stroke="#d0d0d0" stroke-width="2.5"/></g><circle cx="72" cy="124" r="3" fill="#fff"/>`,
+      ann:[[80,138,6,150,"腫大した虫垂"],[72,124,6,80,"糞石"],[94,140,234,170,"周囲脂肪の毛羽立ち"]]}],
+  sx:["心窩部痛から右下腹部痛へ移動","食欲低下、嘔気、発熱"],
+  ct:["虫垂の腫大（径 6mm 超）、壁の肥厚・造影","糞石、周囲の脂肪織濃度上昇","穿孔：虫垂外の空気・膿瘍、壁の欠損"],
+  mri:["妊婦では MRI が使われる"],
+  tech:["冠状断再構成で虫垂の全長を追う","若年者・妊娠可能年齢の女性は被ばく・妊娠の確認を確実に"],
+  rep:["穿孔・膿瘍形成"],
+  ddx:["大腸憩室炎（右側）","回盲部炎（感染性腸炎）","卵巣・卵管の疾患"]
+});
+
+C({id:"diverticulitis", name:"大腸憩室炎", reg:"腹部・骨盤", sev:"urg", alias:"憩室炎 S状結腸 上行結腸",
+  keys:["腹痛（左下腹部）","腹痛（右下腹部）","発熱"],
+  v:[{tpl:"abd-low",m:"CTC",wl:W.abd,cap:"S状結腸の壁肥厚、外側にとび出す憩室（小さな空気の袋）と、その周りの脂肪織濃度上昇。",
+      les:`<ellipse cx="172" cy="114" rx="24" ry="22" fill="#4e4e4e"/><circle cx="168" cy="112" r="13" fill="#000" stroke="#a8a8a8" stroke-width="5"/><circle cx="186" cy="104" r="4" fill="#000" stroke="#a0a0a0" stroke-width="1.2"/><circle cx="184" cy="122" r="3" fill="#000" stroke="#a0a0a0" stroke-width="1.2"/>`,
+      ann:[[160,112,234,60,"壁肥厚"],[186,104,234,90,"憩室"],[188,128,234,150,"周囲の脂肪織濃度上昇"]]}],
+  sx:["左下腹部痛（欧米型）、日本では右側（上行結腸）にも多い","発熱、圧痛"],
+  ct:["憩室と周囲の脂肪織濃度上昇、腸管壁肥厚","合併症：膿瘍、穿孔（腸管外ガス）、瘻孔"],
+  mri:["通常は CT"],
+  tech:["冠状断・矢状断で膿瘍の広がりを確認","右下腹部痛では虫垂との区別のため回盲部も丁寧に"],
+  rep:["穿孔（腸管外ガス）、膿瘍"],
+  ddx:["大腸癌（壁肥厚が限局性で肩がある）","虚血性大腸炎","虫垂炎"]
+});
+
+C({id:"cholecystitis", name:"急性胆嚢炎", reg:"腹部・骨盤", sev:"urg", alias:"胆嚢炎 胆石 Murphy",
+  keys:["腹痛（右上腹部）","発熱","嘔吐・嘔気"],
+  v:[{tpl:"abd-kidney",m:"CTC",wl:W.abd,cap:"胆嚢が腫大し壁が厚く、頸部に胆石。胆嚢周囲の脂肪織濃度上昇と液体。",
+      les:`<ellipse cx="86" cy="94" rx="18" ry="22" fill="#4e4e4e"/><ellipse cx="88" cy="94" rx="13" ry="17" fill="{fluid}" stroke="#c8c8c8" stroke-width="3"/><circle cx="94" cy="108" r="4" fill="#e6e6e6"/>`,
+      ann:[[78,90,6,40,"腫大・壁肥厚した胆嚢"],[94,108,6,130,"胆石（頸部）"],[100,84,234,40,"胆嚢周囲の液体"]]}],
+  sx:["右上腹部痛（脂肪食後）、発熱、嘔気","右季肋部を押すと息が止まる（Murphy 徴候）"],
+  ct:["胆嚢腫大、壁肥厚、周囲の脂肪織濃度上昇・液体","胆石（CT では見えないものも多い）","壊疽・気腫性胆嚢炎（壁内ガス）、穿孔"],
+  mri:["MRCP で胆管結石の評価"],
+  tech:["CT で見えない胆石が多い：超音波の所見も医師に確認","動脈相で胆嚢周囲の肝実質の濃染（炎症の波及）"],
+  rep:["気腫性胆嚢炎（壁内ガス）、穿孔、膿瘍"],
+  ddx:["胆管炎","肝膿瘍","十二指腸潰瘍穿孔"]
+});
+
+C({id:"cholangitis", name:"総胆管結石・急性胆管炎", reg:"腹部・骨盤", sev:"crit", alias:"胆管炎 総胆管結石 閉塞性黄疸 MRCP",
+  keys:["発熱","黄疸","腹痛（右上腹部）","ショック・血圧低下","意識障害","高齢者"],
+  v:[{tpl:"abd-kidney",m:"CT",wl:W.abd,cap:"拡張した総胆管内に高吸収の結石。肝内胆管も拡張しています。",
+      les:`<circle cx="107" cy="116" r="6" fill="{fluid}"/><circle cx="107" cy="116" r="3.2" fill="#d6d6d6"/><path d="M60 92 L76 100 M50 108 L70 108 M64 118 L80 112" stroke="#555" stroke-width="2.4"/>`,
+      ann:[[107,116,234,96,"総胆管内の結石"],[66,104,6,40,"肝内胆管の拡張"]]}],
+  sx:["発熱、黄疸、右上腹部痛（Charcot 3徴）","重症では意識障害、ショック（Reynolds 5徴）","高齢者は症状がはっきりしないことがある"],
+  ct:["総胆管・肝内胆管の拡張、結石（CT で見えないことも多い）","胆管壁の肥厚・造影","動脈相で肝実質の不均一な濃染"],
+  mri:["MRCP：胆管結石と胆管拡張の評価（非侵襲的）"],
+  tech:["MRCP は呼吸同期・息止めを確実に（腹部のコイル位置）","重症例は急変しうる：撮影中のバイタル観察"],
+  rep:["胆管拡張＋結石（緊急ドレナージの対象になりうる）","肝膿瘍の合併"],
+  ddx:["膵頭部癌・胆管癌による閉塞","乳頭部腫瘍"]
+});
+
+C({id:"pancreatitis", name:"急性膵炎", reg:"腹部・骨盤", sev:"crit", alias:"膵炎 胆石性 アルコール性 壊死",
+  keys:["腹痛（上腹部）","背部痛","嘔吐・嘔気","発熱","ショック・血圧低下"],
+  v:[{tpl:"abd-kidney",m:"CTC",wl:W.abd,cap:"膵臓が腫大し、周囲に液体と脂肪織濃度上昇。膵体部に造影不良域（壊死）。",
+      les:`<path d="M100 104 Q130 88 166 86 Q196 86 196 106 Q180 120 158 118 Q132 124 112 132Z" fill="#4e4e4e"/><path d="M104 110 Q130 98 160 94 Q180 92 188 104 Q176 112 158 110 Q132 114 112 126Z" fill="{organ}"/><ellipse cx="146" cy="104" rx="10" ry="5" fill="#6a6a6a"/><path d="M186 120 Q200 140 196 168" stroke="#555" stroke-width="5" fill="none"/>`,
+      ann:[[120,108,6,30,"腫大した膵臓"],[146,104,234,70,"造影不良域（壊死）"],[194,140,234,130,"膵周囲の液体"]]}],
+  sx:["上腹部痛（背中に抜ける）、嘔吐、前かがみで楽","アルコール多飲、胆石、高トリグリセリド血症、ERCP 後"],
+  ct:["膵腫大、膵周囲の脂肪織濃度上昇・液体","造影不良域（壊死）","CT 重症度分類（造影CT Grade）に使われる","合併症：仮性嚢胞、被包化壊死、仮性動脈瘤、門脈血栓"],
+  mri:["MRCP で胆管結石の評価"],
+  tech:["造影は膵実質相〜門脈相で（造影不良域の評価）","腎機能・脱水に注意し、造影剤使用は医師判断","腹痛で仰臥位がつらい：体位の工夫"],
+  rep:["広い造影不良域、出血、仮性動脈瘤","胆管結石（胆石性膵炎）"],
+  ddx:["消化管穿孔","膵癌","腸間膜虚血"]
+});
+
+C({id:"hcc", name:"肝細胞癌", reg:"腹部・骨盤", sev:"rout", alias:"HCC 肝癌 早期濃染 washout ダイナミック",
+  keys:["無症状（偶然発見）","腹痛（右上腹部）","体重減少","黄疸","腹部膨満"],
+  v:[{tpl:"abd-upper",m:"CTC",label:"造影CT 動脈相",wl:W.abd,cap:"動脈相で肝右葉の腫瘤が周囲の肝より強く染まる（早期濃染）。",
+      les:`<circle cx="66" cy="122" r="14" fill="#d8d8d8"/>`, ann:[[66,122,6,96,"早期濃染"]]},
+     {tpl:"abd-upper",m:"CTC",label:"造影CT 平衡相",wl:W.abd,cap:"平衡相では周囲の肝より暗くなり（washout）、被膜が輪状に染まる。",
+      les:`<circle cx="66" cy="122" r="14" fill="#7a7a7a" stroke="#c4c4c4" stroke-width="2"/>`, ann:[[66,122,6,96,"washout"],[80,122,6,160,"被膜の造影"]]}],
+  sx:["慢性肝炎・肝硬変（B型・C型肝炎、アルコール、脂肪肝）","多くは無症状でスクリーニングで発見","破裂すると腹痛・ショック"],
+  ct:["ダイナミックCT：動脈相の早期濃染と門脈相・平衡相の washout","被膜、モザイク状の内部","門脈腫瘍栓"],
+  mri:["EOB（Gd-EOB-DTPA）造影 MRI：肝細胞相で低信号","DWI で高信号"],
+  tech:["ボーラストラッキングで動脈相のタイミングを合わせる（後期動脈相が重要）","各相で同じ息止め位置にする（比較のため）"],
+  rep:["腫瘍破裂（腹腔内出血）","門脈腫瘍栓"],
+  ddx:["血管腫（辺縁から結節状に染まり持続）","転移性肝腫瘍","異形成結節"]
+});
+
+C({id:"liver-abscess", name:"肝膿瘍", reg:"腹部・骨盤", sev:"urg", alias:"細菌性肝膿瘍 アメーバ cluster sign",
+  keys:["発熱","腹痛（右上腹部）","免疫低下・糖尿病","高齢者"],
+  v:[{tpl:"abd-upper",m:"CTC",wl:W.abd,cap:"肝右葉に辺縁が造影される低吸収域。内部に隔壁が多く房状（cluster sign）。",
+      les:`<circle cx="62" cy="130" r="18" fill="#6a6a6a"/><circle cx="62" cy="130" r="14" fill="#4e4e4e" stroke="#c8c8c8" stroke-width="2"/><path d="M50 128 L74 132 M62 116 L60 144" stroke="#a8a8a8" stroke-width="1.6"/>`,
+      ann:[[62,130,6,96,"隔壁を伴う低吸収域"],[46,140,6,170,"周囲の浮腫（double target）"]]}],
+  sx:["発熱（悪寒戦慄）、右上腹部痛","糖尿病、胆道疾患、高齢者","クレブシエラ菌では眼内炎などの遠隔転移"],
+  ct:["辺縁造影を伴う低吸収、隔壁・多房性","ガスを含むこともある","胆管炎・門脈炎の合併"],
+  mri:["DWI で内部が高信号"],
+  tech:["造影は動脈相＋門脈相で辺縁の造影と周囲の濃染を評価","ドレナージ計画のため位置関係を再構成"],
+  rep:["ガスを含む膿瘍、破裂"],
+  ddx:["嚢胞（壁なし、造影なし）","壊死性腫瘍","転移"]
+});
+
+C({id:"liver-injury", name:"肝損傷", reg:"腹部・骨盤", sev:"crit", alias:"外傷 肝裂傷 腹腔内出血",
+  keys:["腹部外傷","高エネルギー外傷","腹痛（右上腹部）","ショック・血圧低下"],
+  v:[{tpl:"abd-upper",m:"CTC",wl:W.abd,cap:"肝右葉の不整な低吸収（裂傷）、肝周囲の液体（腹腔内出血）、裂傷内に造影剤の漏れ。",
+      les:`<path d="M30 112 Q40 104 54 118 Q66 110 76 128 Q62 130 52 140 Q40 132 30 112Z" fill="#6a6a6a"/><circle cx="56" cy="124" r="3.2" fill="#f4f4f4"/><path d="M26 130 Q28 160 46 174" stroke="#787878" stroke-width="7" fill="none"/>`,
+      ann:[[48,124,6,90,"裂傷"],[56,124,6,60,"造影剤の血管外漏出"],[32,160,6,190,"肝周囲の出血"]]}],
+  sx:["交通事故・転落・腹部打撲後の右上腹部痛","ショック（腹腔内出血）"],
+  ct:["裂傷・実質内血腫・被膜下血腫","腹腔内出血（CT 値が高い液体、センチネルクロット）","動脈相・門脈相での造影剤漏出（活動性出血）"],
+  mri:["急性期は CT"],
+  tech:["外傷全身CT：動脈相＋門脈相（必要に応じて遅延相）","造影剤漏出は即時に医師へ（塞栓術・手術の判断）","撮影中の血圧低下に注意"],
+  rep:["造影剤の血管外漏出","大量の腹腔内出血"],
+  ddx:["正常の肝裂（葉間裂）","肝嚢胞"]
+});
+
+C({id:"spleen-injury", name:"脾損傷", reg:"腹部・骨盤", sev:"crit", alias:"外傷 脾臓 被膜下血腫",
+  keys:["腹部外傷","高エネルギー外傷","腹痛（上腹部）","ショック・血圧低下"],
+  v:[{tpl:"abd-upper",m:"CTC",wl:W.abd,cap:"脾臓の裂傷（線状の低吸収）と被膜下血腫（三日月状）、内部に造影剤の漏れ。",
+      les:`<path d="M206 124 Q216 144 206 166" stroke="#6a6a6a" stroke-width="6" fill="none"/><path d="M184 132 L202 150" stroke="#555" stroke-width="3"/><circle cx="194" cy="142" r="2.8" fill="#f4f4f4"/>`,
+      ann:[[192,142,234,100,"裂傷と造影剤漏出"],[208,154,234,190,"被膜下血腫"]]}],
+  sx:["左上腹部痛、左肩への放散痛（Kehr 徴候）","ショック"],
+  ct:["裂傷・被膜下血腫・脾周囲の血液","造影剤漏出、仮性動脈瘤","遅れて破裂すること（遅発性破裂）がある"],
+  mri:["急性期は CT"],
+  tech:["動脈相＋門脈相（造影不均一な脾臓の正常像との区別に門脈相が必要）"],
+  rep:["造影剤の血管外漏出・仮性動脈瘤"],
+  ddx:["動脈相の正常な不均一造影（まだら脾）","脾裂"]
+});
+
+C({id:"kidney-injury", name:"腎損傷", reg:"腹部・骨盤", sev:"crit", alias:"外傷 腎裂傷 尿漏",
+  keys:["腹部外傷","側腹部痛","血尿","高エネルギー外傷","ショック・血圧低下"],
+  v:[{tpl:"abd-kidney",m:"CTC",wl:W.abd,cap:"右腎の裂傷と周囲の血腫（腎周囲腔）。遅延相で尿の漏れを確認します。",
+      les:`<ellipse cx="62" cy="156" rx="26" ry="32" fill="#727272" transform="rotate(-25 62 156)"/><g transform="rotate(-25 64 154)"><ellipse cx="64" cy="154" rx="17" ry="24" fill="{organ}"/><path d="M48 150 L72 160" stroke="#555" stroke-width="4"/></g>`,
+      ann:[[60,156,6,180,"裂傷"],[44,180,6,214,"腎周囲血腫"]]}],
+  sx:["側腹部・背部の打撲、血尿","ショック"],
+  ct:["裂傷、腎周囲血腫、造影剤漏出","腎盂・尿管損傷では遅延相で造影剤（尿）の漏出","腎動脈損傷：腎全体の造影不良"],
+  mri:["急性期は CT"],
+  tech:["動脈相＋門脈相＋遅延相（排泄相、数分後）で尿漏を評価"],
+  rep:["造影剤漏出、腎全体の造影不良（腎動脈損傷）"],
+  ddx:["腎嚢胞","腎梗塞"]
+});
+
+C({id:"ureter-stone", name:"尿管結石・水腎症", reg:"腹部・骨盤", sev:"urg", alias:"尿路結石 水腎症 腎盂腎炎 疝痛",
+  keys:["側腹部痛","腰痛","血尿","嘔吐・嘔気","腹痛（右下腹部）"],
+  v:[{tpl:"abd-kidney",m:"CT",wl:W.abd,cap:"右腎盂が拡張（水腎症）し、腎周囲の脂肪が毛羽立っています。",
+      les:`<g transform="rotate(-25 64 154)"><ellipse cx="72" cy="154" rx="9" ry="13" fill="{fluid}"/></g><path d="M42 140 Q36 156 46 176" stroke="#4e4e4e" stroke-width="4" fill="none"/>`,
+      ann:[[72,154,6,180,"拡張した腎盂"],[42,156,6,120,"腎周囲脂肪の毛羽立ち"]]},
+     {tpl:"abd-low",m:"CT",label:"単純CT（下のスライス）",wl:W.abd,cap:"右尿管内に高吸収の結石。周囲に尿管壁の輪（rim sign）。",
+      les:`<circle cx="92" cy="146" r="4.5" fill="#6e6e6e"/><circle cx="92" cy="146" r="2.6" fill="#f0f0f0"/>`, ann:[[92,146,6,206,"尿管結石"]]}],
+  sx:["突然の側腹部〜背部の激痛（疝痛）、下腹部・陰部へ放散","血尿、嘔気","発熱を伴う場合は閉塞性腎盂腎炎（緊急）"],
+  ct:["単純CTで尿管結石（ほとんどが高吸収）","水腎症、腎周囲の脂肪織濃度上昇","静脈石との区別：rim sign（結石）、comet tail sign（静脈石）"],
+  mri:["妊婦などで使用"],
+  tech:["単純CT・低線量で十分なことが多い","冠状断で尿管の走行に沿って結石を追う","発熱がある場合は医師に伝え、造影の要否を確認"],
+  rep:["発熱を伴う水腎症（閉塞性腎盂腎炎）、腎周囲への尿の漏れ"],
+  ddx:["静脈石","虫垂炎","腹部大動脈瘤（高齢者の側腹部痛）"]
+});
+
+C({id:"pyelonephritis", name:"急性腎盂腎炎", reg:"腹部・骨盤", sev:"urg", alias:"腎盂腎炎 腎膿瘍 尿路感染",
+  keys:["発熱","側腹部痛","腰痛","嘔吐・嘔気","免疫低下・糖尿病"],
+  v:[{tpl:"abd-kidney",m:"CTC",wl:W.abd,cap:"左腎に楔状・線状の造影不良域（striated nephrogram）と、腎周囲の脂肪織濃度上昇。",
+      les:`<g transform="rotate(25 176 154)"><path d="M176 132 L190 146 L182 150Z" fill="#6a6a6a"/><path d="M188 158 L178 176 L174 162Z" fill="#6a6a6a"/></g><path d="M198 140 Q206 158 196 178" stroke="#4e4e4e" stroke-width="4" fill="none"/>`,
+      ann:[[184,146,234,110,"楔状の造影不良"],[200,160,234,190,"腎周囲の毛羽立ち"]]}],
+  sx:["発熱（悪寒）、側腹部痛・背部の叩打痛","女性、糖尿病、尿路の閉塞・奇形"],
+  ct:["楔状・線状の造影不良（striated nephrogram）","腎腫大、腎周囲の脂肪織濃度上昇","膿瘍、気腫性腎盂腎炎（ガス）、閉塞（結石）"],
+  mri:["造影剤が使えない場合に DWI が有用"],
+  tech:["腎実質相〜排泄相のタイミングで造影不良を評価","閉塞の有無（結石）を確認"],
+  rep:["気腫性腎盂腎炎（ガス）、膿瘍、閉塞を伴う水腎症"],
+  ddx:["腎梗塞","腎腫瘍"]
+});
+
+C({id:"aaa-rupture", name:"腹部大動脈瘤破裂", reg:"腹部・骨盤", sev:"crit", alias:"AAA 破裂 後腹膜血腫",
+  keys:["腹痛（腹部全体）","腰痛","背部痛","ショック・血圧低下","失神","高齢者","高血圧"],
+  v:[{tpl:"abd-mid",m:"CTC",wl:W.abd,cap:"腹部大動脈が瘤状に拡張し、左後腹膜に大きな血腫。造影剤が瘤外に漏れています。",
+      les:`<path d="M150 136 Q200 140 204 190 Q170 200 148 186Z" fill="#7c7c7c"/><circle cx="134" cy="158" r="26" fill="#6e6e6e"/><circle cx="130" cy="156" r="14" fill="#efefef"/><circle cx="156" cy="160" r="4" fill="#efefef"/>`,
+      ann:[[130,156,6,214,"大動脈瘤"],[180,170,234,190,"後腹膜血腫"],[156,160,234,130,"造影剤の漏出"]]}],
+  sx:["突然の腹痛・腰背部痛、ショック、失神","高齢男性、喫煙、高血圧","拍動性の腹部腫瘤"],
+  ct:["大動脈瘤と瘤周囲・後腹膜の血腫","造影剤の血管外漏出","単純CTでの瘤壁の三日月状高吸収（切迫破裂）"],
+  mri:["急性期は CT"],
+  tech:["ショック状態の撮影：検査は最短で、医師・看護師と一緒に","撮像範囲は胸部〜大腿（ステントグラフト計画）","尿管結石と誤診されやすい（高齢者の側腹部痛）"],
+  rep:["後腹膜血腫・造影剤漏出（最優先で共有）"],
+  ddx:["尿管結石","大動脈解離","大動脈周囲炎"]
+});
+
+C({id:"sma-occlusion", name:"上腸間膜動脈閉塞症", reg:"腹部・骨盤", sev:"crit", alias:"急性腸管虚血 SMA塞栓 NOMI 腸管壊死",
+  keys:["腹痛（腹部全体）","嘔吐・嘔気","血便・下血","ショック・血圧低下","高齢者"],
+  v:[{tpl:"abd-kidney",m:"CTC",label:"造影CT 動脈相",wl:W.abd,cap:"上腸間膜動脈が造影されず（血栓・塞栓）、本来白いはずの血管が灰色。",
+      les:`<circle cx="130" cy="124" r="4.5" fill="#5e5e5e"/>`, ann:[[130,124,234,40,"造影されない上腸間膜動脈"]]},
+     {tpl:"abd-mid",m:"CTC",label:"造影CT 門脈相",wl:W.abd,cap:"小腸の壁が薄く造影されず（紙のように薄い壁）、壁内にガス（腸管壊死）。",
+      les:`${[[70,90],[96,76],[84,120]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="10" fill="{fluid}" stroke="#5e5e5e" stroke-width="1"/>`).join("")}${dots([[63,86],[66,96],[90,72],[78,116],[80,126]],1.6,"#000")}`,
+      ann:[[70,90,6,40,"造影されない腸管壁"],[66,96,6,130,"腸管壁内ガス"]]}],
+  sx:["突然の激しい腹痛なのに腹部所見が乏しい（初期）","心房細動・心疾患の既往（塞栓）、動脈硬化（血栓）","進行すると血便、腹膜炎、ショック"],
+  ct:["SMA の造影欠損（動脈相）","腸管壁の造影不良、拡張、壁内ガス、門脈内ガス（進行例）","NOMI（非閉塞性）では血管は開存しているが細い"],
+  mri:["急性期は CT"],
+  tech:["動脈相が必須（単純＋動脈相＋門脈相）","撮影が遅れるほど壊死が進む：迅速な撮影を"],
+  rep:["SMA の造影欠損","腸管壁内ガス・門脈内ガス"],
+  ddx:["絞扼性腸閉塞","急性膵炎","虚血性大腸炎"]
+});
+
+C({id:"ischemic-colitis", name:"虚血性大腸炎", reg:"腹部・骨盤", sev:"urg", alias:"虚血性腸炎 下行結腸 血便",
+  keys:["腹痛（左下腹部）","血便・下血","下痢","高齢者"],
+  v:[{tpl:"abd-mid",m:"CTC",wl:W.abd,cap:"下行結腸の壁が全周性に厚くなり（浮腫）、周囲の脂肪織が毛羽立っています。",
+      les:`<circle cx="200" cy="134" r="17" fill="#4e4e4e"/><circle cx="200" cy="134" r="12" fill="#7a7a7a"/><circle cx="200" cy="134" r="4" fill="#000"/>`,
+      ann:[[192,134,234,100,"下行結腸の壁肥厚"],[212,148,234,170,"周囲の毛羽立ち"]]}],
+  sx:["突然の左下腹部痛に続く血便・下痢","高齢者、便秘、動脈硬化"],
+  ct:["脾彎曲〜下行結腸・S状結腸の区域性の壁肥厚","粘膜下浮腫（target 状）","壁内ガス・造影不良は壊死型を示唆"],
+  mri:["通常は CT"],
+  tech:["腸管壁の造影効果を評価できる時相で"],
+  rep:["壁内ガス・造影不良（壊死型）"],
+  ddx:["感染性腸炎","潰瘍性大腸炎","大腸癌"]
+});
+
+C({id:"intussusception", name:"腸重積", reg:"腹部・骨盤", sev:"urg", alias:"腸重積 target sign 先進部",
+  keys:["腹痛（腹部全体）","嘔吐・嘔気","血便・下血","腹部膨満"],
+  v:[{tpl:"abd-mid",m:"CTC",wl:W.abd,cap:"腸管の中に腸管が入り込み、何重もの輪に見える（target sign）。成人では腫瘍などの先進部があることが多い。",
+      les:`<circle cx="84" cy="120" r="18" fill="{fluid}" stroke="#bcbcbc" stroke-width="2.4"/><circle cx="86" cy="120" r="12" fill="#3a3a3a"/><circle cx="88" cy="120" r="8" fill="#a8a8a8"/><circle cx="88" cy="120" r="3" fill="#545454"/>`,
+      ann:[[84,104,6,60,"外側の腸管"],[86,128,6,170,"入り込んだ腸管と腸間膜脂肪"]]}],
+  sx:["小児：間欠的な腹痛（泣く）、嘔吐、イチゴゼリー状の血便","成人：腹痛、腸閉塞症状（腫瘍などの先進部）"],
+  ct:["target sign（横断）、sausage sign（長軸）","重積した腸間膜脂肪・血管","先進部の腫瘤、腸閉塞の合併"],
+  mri:["小児は超音波が第一選択"],
+  tech:["冠状断・矢状断で長軸像を作ると分かりやすい","小児は超音波が基本で、CT は被ばくに配慮して医師判断"],
+  rep:["腸閉塞・虚血の合併"],
+  ddx:["一過性の小腸重積（無症状）","腸管壁肥厚"]
+});
+
+C({id:"sigmoid-volvulus", name:"S状結腸軸捻転", reg:"腹部・骨盤", sev:"crit", alias:"軸捻転 coffee bean 便秘 高齢者",
+  keys:["腹部膨満","腹痛（腹部全体）","嘔吐・嘔気","高齢者"],
+  v:[{tpl:"abd-mid",m:"CT",wl:W.abd,cap:"著しく拡張した S 状結腸が腹部の大部分を占めています（コーヒー豆状）。根元で腸間膜がねじれています。",
+      les:`<ellipse cx="124" cy="96" rx="76" ry="40" fill="#000" stroke="{soft}" stroke-width="3"/><path d="M124 58 L124 134" stroke="{soft}" stroke-width="3"/><circle cx="96" cy="160" r="12" fill="#4c4c4c"/><path d="M96 160 m-2 0 a2 2 0 1 1 4 0 a5 5 0 1 1 -10 0 a8 8 0 1 1 16 0" stroke="#c6c6c6" stroke-width="2" fill="none"/>`,
+      ann:[[80,96,6,40,"拡張した S 状結腸"],[124,96,234,40,"接した腸管壁（豆の割れ目）"],[96,160,6,200,"ねじれた腸間膜（whirl）"]]}],
+  sx:["高度の腹部膨満、腹痛、排便・排ガス停止","高齢者、長期臥床、慢性便秘、精神疾患・神経疾患"],
+  ct:["著明に拡張した S 状結腸（コーヒー豆状）","whirl sign、捻転部の beak sign","腸管壁の造影不良・壁内ガス（壊死）"],
+  mri:["通常は CT"],
+  tech:["腹部全体がガスで膨らむ：撮像範囲を広めに","内視鏡的整復の前の情報として捻転部位を冠状断で"],
+  rep:["壊死・穿孔を疑う所見"],
+  ddx:["盲腸軸捻転","偽性腸閉塞（Ogilvie 症候群）"]
+});
+
+C({id:"obturator-hernia", name:"閉鎖孔ヘルニア嵌頓", reg:"腹部・骨盤", sev:"crit", alias:"閉鎖孔ヘルニア 高齢女性 やせ Howship-Romberg",
+  keys:["嘔吐・嘔気","腹痛（下腹部）","鼠径部・大腿内側の痛み","腹部膨満","高齢者"],
+  v:[{tpl:"pelvis",m:"CTC",wl:W.abd,cap:"右恥骨筋の背側（閉鎖孔）に小腸が入り込んでいます。",
+      les:`<circle cx="84" cy="120" r="8" fill="{fluid}" stroke="#bcbcbc" stroke-width="2"/>`, ann:[[84,120,6,120,"閉鎖孔に入り込んだ小腸"]]}],
+  sx:["やせた高齢女性の腸閉塞","大腿内側〜膝の痛み（Howship-Romberg 徴候）","外から触れにくい"],
+  ct:["恥骨筋と外閉鎖筋の間の腸管","口側腸管の拡張（腸閉塞）","嵌頓腸管の造影不良"],
+  mri:["通常は CT"],
+  tech:["腸閉塞の原因が分からないときは骨盤底まで撮像範囲を含める","冠状断で閉鎖孔を確認"],
+  rep:["嵌頓（腸閉塞の原因として）"],
+  ddx:["大腿ヘルニア","鼠径ヘルニア"]
+});
+
+C({id:"crc", name:"大腸癌", reg:"腹部・骨盤", sev:"rout", alias:"大腸癌 結腸癌 apple core 閉塞",
+  keys:["血便・下血","腹部膨満","体重減少","腹痛（腹部全体）","無症状（偶然発見）"],
+  v:[{tpl:"abd-mid",m:"CTC",wl:W.abd,cap:"上行結腸の壁が全周性に厚くなり、内腔が狭くなっています。周囲に小さなリンパ節。",
+      les:`<circle cx="42" cy="130" r="15" fill="#8a8a8a"/><path d="M39 126 Q44 130 40 135" stroke="#000" stroke-width="2.4" fill="none"/>${dots([[64,144],[58,152]],3,"#7a7a7a")}`,
+      ann:[[42,130,6,96,"全周性の壁肥厚"],[64,144,6,170,"リンパ節"]]}],
+  sx:["血便、便通異常、腹部膨満（閉塞）、貧血、体重減少","右側は症状が出にくく貧血で見つかることも"],
+  ct:["限局性の壁肥厚（肩のある狭窄）","リンパ節・肝・肺・腹膜転移","閉塞による口側腸管の拡張、穿孔"],
+  mri:["直腸癌の局所進展評価に MRI"],
+  tech:["CT colonography（大腸 CT）では十分な送気と腹臥位・仰臥位の2体位","病期診断は胸部〜骨盤の造影CT"],
+  rep:["腸閉塞・穿孔"],
+  ddx:["憩室炎","虚血性大腸炎","炎症性腸疾患"]
+});
+
+C({id:"pancreatic-ca", name:"膵癌", reg:"腹部・骨盤", sev:"rout", alias:"膵管癌 double duct 黄疸",
+  keys:["黄疸","体重減少","背部痛","腹痛（上腹部）","無症状（偶然発見）"],
+  v:[{tpl:"abd-kidney",m:"CTC",label:"造影CT 膵実質相",wl:W.abd,cap:"膵頭部に周囲より造影されにくい（乏血性の）腫瘤。尾側の膵管と総胆管が拡張（double duct sign）。",
+      les:`<ellipse cx="108" cy="116" rx="11" ry="9" fill="#6e6e6e"/><path d="M122 108 Q150 100 180 100" stroke="{fluid}" stroke-width="2.6" fill="none"/><circle cx="102" cy="104" r="4.5" fill="{fluid}"/>`,
+      ann:[[108,118,6,140,"乏血性の腫瘤"],[160,101,234,70,"拡張した膵管"],[102,104,6,30,"拡張した総胆管"]]}],
+  sx:["初期は無症状、背部痛、体重減少、閉塞性黄疸","糖尿病の新規発症・急な悪化"],
+  ct:["膵実質相で周囲より低吸収の腫瘤","主膵管の拡張、double duct sign","血管浸潤（SMA・門脈）、肝転移、腹膜播種"],
+  mri:["MRCP、DWI、EOB-MRI で肝転移"],
+  tech:["膵臓プロトコル：膵実質相（後期動脈相）と門脈相の2相以上","薄いスライスで血管との関係を再構成"],
+  rep:["（通常は待機的）閉塞性胆管炎の合併"],
+  ddx:["自己免疫性膵炎","腫瘤形成性膵炎","IPMN"]
+});
+
+C({id:"rcc", name:"腎細胞癌", reg:"腹部・骨盤", sev:"rout", alias:"腎癌 淡明細胞型",
+  keys:["無症状（偶然発見）","血尿","側腹部痛","体重減少"],
+  v:[{tpl:"abd-kidney",m:"CTC",label:"造影CT 皮髄相",wl:W.abd,cap:"左腎から外側に突出する不均一に強く造影される腫瘤。内部に壊死。",
+      les:`<circle cx="190" cy="148" r="15" fill="#d4d4d4"/><circle cx="194" cy="146" r="5" fill="#5a5a5a"/>`,
+      ann:[[190,148,234,110,"不均一に造影される腫瘤"],[194,146,234,180,"壊死"]]}],
+  sx:["多くは無症状（健診・他の検査で偶然発見）","血尿、側腹部痛、腹部腫瘤（進行例）"],
+  ct:["皮髄相で強く不均一に造影（淡明細胞型）","腎静脈・下大静脈の腫瘍栓","嚢胞性病変の Bosniak 分類"],
+  mri:["CT で判断しにくい嚢胞性病変、造影剤が使いにくい場合"],
+  tech:["単純＋皮髄相＋腎実質相（＋排泄相）","単純CT との CT 値の差で造影効果を判定"],
+  rep:["腫瘍破裂・出血（血管筋脂肪腫でも）"],
+  ddx:["血管筋脂肪腫（脂肪を含む）","オンコサイトーマ","腎嚢胞"]
+});
+
+C({id:"enterocolitis", name:"感染性腸炎", reg:"腹部・骨盤", sev:"rout", alias:"腸炎 カンピロバクター サルモネラ 回盲部",
+  keys:["下痢","発熱","腹痛（右下腹部）","腹痛（腹部全体）","嘔吐・嘔気","血便・下血"],
+  v:[{tpl:"abd-mid",m:"CTC",wl:W.abd,cap:"上行結腸の壁が浮腫状に厚くなり、小腸内に液体が多い。",
+      les:`<circle cx="42" cy="130" r="16" fill="#7a7a7a"/><circle cx="42" cy="130" r="9" fill="{fluid}"/>${[[70,90],[96,76],[84,120],[126,96]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="10" fill="{fluid}" stroke="#bcbcbc" stroke-width="2"/>`).join("")}`,
+      ann:[[30,130,6,96,"上行結腸の壁肥厚"],[96,76,6,30,"液体の多い小腸"]]}],
+  sx:["下痢、腹痛、発熱、嘔吐","鶏肉・生肉・卵などの摂取歴、集団発生"],
+  ct:["回盲部〜上行結腸の壁肥厚（カンピロバクター、サルモネラ、エルシニアなど）","腸管内の液体貯留","腸間膜リンパ節腫大"],
+  mri:["通常は CT（必要な場合のみ）"],
+  tech:["感染対策（接触予防策）と寝台の清拭","右下腹部痛では虫垂も確認"],
+  rep:["穿孔・膿瘍、壁内ガス（虚血）"],
+  ddx:["虫垂炎","炎症性腸疾患","虚血性大腸炎"]
+});
+
+C({id:"psoas-abscess", name:"腸腰筋膿瘍", reg:"腹部・骨盤", sev:"urg", alias:"腸腰筋膿瘍 化膿性脊椎炎",
+  keys:["発熱","腰痛","股関節痛","歩行障害","免疫低下・糖尿病"],
+  v:[{tpl:"abd-kidney",m:"CTC",wl:W.abd,cap:"右腸腰筋が腫大し、内部に辺縁が造影される低吸収（膿瘍）とガス。",
+      les:`<ellipse cx="98" cy="174" rx="17" ry="14" fill="{soft}"/><ellipse cx="98" cy="174" rx="11" ry="9" fill="{fluid}" stroke="#c8c8c8" stroke-width="2"/><circle cx="96" cy="170" r="2" fill="#000"/>`,
+      ann:[[98,174,6,214,"腸腰筋内の膿瘍"],[96,170,6,190,"ガス"]]}],
+  sx:["発熱、腰痛、股関節を伸ばすと痛む（psoas 徴候）","糖尿病、透析、化膿性脊椎炎・腎盂腎炎からの波及"],
+  ct:["腸腰筋の腫大、辺縁造影を伴う低吸収、ガス","原因（脊椎炎、腎、腸管）の検索"],
+  mri:["脊椎炎の合併評価"],
+  tech:["造影CTで膿瘍壁を評価","脊椎まで含めて評価できるよう骨条件も再構成"],
+  rep:["ガス産生、脊椎炎の合併"],
+  ddx:["腸腰筋血腫（抗凝固療法中）","腫瘍"]
+});
+
+C({id:"ovarian-torsion", name:"卵巣（付属器）茎捻転", reg:"腹部・骨盤", sev:"crit", alias:"卵巣捻転 卵巣腫瘍 皮様嚢腫",
+  keys:["腹痛（下腹部）","嘔吐・嘔気","腹痛（右下腹部）","妊娠の可能性"],
+  v:[{tpl:"pelvis",m:"CTC",wl:W.abd,cap:"右卵巣が腫大し造影不良、周辺に小さな卵胞が並ぶ。子宮との間にねじれた茎（whirl）と少量の腹水。",
+      les:`<ellipse cx="94" cy="128" rx="20" ry="17" fill="#6a6a6a"/>${dots([[80,122],[84,138],[100,140],[106,120],[92,114]],3,"#505050")}<circle cx="110" cy="138" r="6" fill="#4c4c4c"/><path d="M110 138 m-1.5 0 a1.5 1.5 0 1 1 3 0 a4 4 0 1 1 -8 0" stroke="#c6c6c6" stroke-width="1.4" fill="none"/><path d="M100 176 Q120 184 140 176" stroke="#555" stroke-width="4" fill="none"/>`,
+      ann:[[94,128,6,100,"腫大した卵巣（造影不良）"],[110,138,6,170,"ねじれた茎"],[120,182,234,206,"腹水"]]}],
+  sx:["突然の下腹部痛、嘔吐","卵巣腫瘍（皮様嚢腫など）、妊娠中、小児・若年女性"],
+  ct:["卵巣の腫大、周辺に並ぶ卵胞、造影不良","whirl sign（捻れた茎）、子宮の患側への偏位","腹水"],
+  mri:["妊婦・若年者で超音波の次に使われる"],
+  tech:["妊娠の可能性を必ず確認（妊娠反応の結果）","若年女性の被ばくに配慮しつつ、救急では迅速に"],
+  rep:["茎捻転を疑う所見（卵巣温存のため時間が重要）"],
+  ddx:["出血性黄体嚢胞","異所性妊娠","虫垂炎"]
+});
+
+C({id:"ectopic", name:"異所性妊娠（破裂）", reg:"腹部・骨盤", sev:"crit", alias:"子宮外妊娠 卵管妊娠 腹腔内出血",
+  keys:["腹痛（下腹部）","不正性器出血・月経異常","ショック・血圧低下","失神","妊娠の可能性"],
+  v:[{tpl:"pelvis",m:"CTC",wl:W.abd,cap:"子宮の左側に輪状に造影される腫瘤（胎嚢）と、骨盤内に CT 値の高い液体（腹腔内出血）。",
+      les:`<path d="M80 166 Q120 200 160 166 Q150 152 140 156 Q120 176 100 156 Q90 152 80 166Z" fill="#7a7a7a"/><circle cx="144" cy="128" r="8" fill="{fluid}" stroke="#d4d4d4" stroke-width="2.4"/><path d="M60 100 Q70 90 80 100" stroke="#7a7a7a" stroke-width="5" fill="none"/>`,
+      ann:[[144,128,234,110,"輪状に造影される胎嚢"],[120,178,234,206,"骨盤内の出血"]]}],
+  sx:["月経の遅れ、下腹部痛、性器出血","破裂でショック、失神","妊娠反応陽性で子宮内に胎嚢がない"],
+  ct:["付属器の輪状造影腫瘤","腹腔内出血（CT 値の高い液体、凝血塊）","造影剤漏出"],
+  mri:["状態が安定していれば使われることがある"],
+  tech:["妊娠反応の確認（妊娠可能年齢の女性の腹痛では必須）","CT の要否は医師判断。ショックでは撮影中の急変に備える"],
+  rep:["腹腔内出血（最優先で共有）"],
+  ddx:["黄体出血","卵巣茎捻転","虫垂炎"]
+});
+
+C({id:"myoma", name:"子宮筋腫", reg:"腹部・骨盤", sev:"rout", alias:"筋腫 過多月経 T2低信号",
+  keys:["不正性器出血・月経異常","腹痛（下腹部）","腹部膨満","無症状（偶然発見）"],
+  v:[{tpl:"pelvis",m:"T2",wl:"T2強調像",cap:"子宮が腫大し、境界明瞭で T2 で真っ黒な（低信号）腫瘤。",
+      les:`<ellipse cx="120" cy="138" rx="28" ry="18" fill="{organ}"/><ellipse cx="128" cy="140" rx="16" ry="12" fill="#1e1e1e"/>`,
+      ann:[[128,140,234,128,"T2 低信号の筋腫"],[104,136,6,174,"腫大した子宮"]]}],
+  sx:["過多月経・貧血、月経痛、頻尿・便秘（圧迫）","無症状のことも多い"],
+  ct:["子宮の腫大・分葉状、石灰化"],
+  mri:["T2 で境界明瞭な低信号腫瘤（典型）","変性（赤色変性・嚢胞変性）で信号が変わる","子宮肉腫との鑑別（不整、出血、DWI 高信号）"],
+  tech:["子宮の長軸に合わせた矢状断・横断（斜断面）","腸管の動きを抑えるため鎮痙剤を使うことがある（禁忌の確認）"],
+  rep:["茎捻転・赤色変性（急な腹痛）"],
+  ddx:["子宮腺筋症","子宮肉腫","卵巣腫瘍"]
+});
+
+C({id:"fournier", name:"壊死性軟部組織感染症（フルニエ壊疽）", reg:"腹部・骨盤", sev:"crit", alias:"壊死性筋膜炎 フルニエ ガス壊疽",
+  keys:["発熱","皮膚の発赤・腫脹","ショック・血圧低下","免疫低下・糖尿病"],
+  v:[{tpl:"pelvis",m:"CT",wl:W.abd,cap:"会陰〜殿部の皮下脂肪の濃度上昇と、筋膜に沿ったガス（模式図）。",
+      les:`<path d="M20 160 Q40 214 120 214 Q200 214 220 160" stroke="#555" stroke-width="10" fill="none"/>${dots([[30,174],[40,190],[56,202],[184,202],[200,190],[110,206],[126,208],[74,206]],2.2,"#000")}`,
+      ann:[[40,190,6,214,"皮下のガス"],[200,180,234,150,"脂肪織の濃度上昇"]]}],
+  sx:["会陰・陰嚢・殿部の痛み、腫れ、発赤、急速に広がる","発熱、ショック","糖尿病、アルコール多飲、免疫低下"],
+  ct:["皮下・筋膜に沿ったガス","脂肪織の濃度上昇、液体貯留","原因（肛門周囲膿瘍、尿路）の検索"],
+  mri:["急性期は CT（ガスの検出）"],
+  tech:["撮像範囲は腹部〜大腿まで広く（広がりの評価）","ガスは肺野条件で見ると分かりやすい"],
+  rep:["軟部組織内のガス（緊急手術の対象）"],
+  ddx:["蜂窩織炎（ガスなし）","術後・処置後のガス"]
+});
+
+</script>
+<script>/* data-mri.js */
+/* MRI の模式図の追加（CT のみだった症例など） */
+function addV(id, view){ const c = CASES.find(x=>x.id===id); if (c) c.v.push(view); }
+const MR_PHR = "M110 142 Q100 152 98 170 L105 170 Q107 156 115 146Z";
+
+/* ---- 頭部 ---- */
+addV("ich",{tpl:"head-vent",m:"T2S",wl:"T2*強調像",cap:"血腫は T2* で強い低信号（黒）。周囲の浮腫は高信号。微小出血の検索や、出血の原因（海綿状血管腫など）の手がかりになります。",
+  les:`<ellipse cx="84" cy="118" rx="17" ry="24" fill="#9a9a9a"/><ellipse cx="84" cy="118" rx="12" ry="18" fill="#0c0c0c"/><circle cx="150" cy="70" r="2" fill="#0c0c0c"/><circle cx="168" cy="150" r="1.8" fill="#0c0c0c"/>`,
+  ann:[[84,110,6,40,"血腫（低信号）"],[74,134,6,200,"周囲の浮腫"],[150,70,234,40,"微小出血"]]});
+addV("thalamic",{tpl:"head-vent",m:"T2S",wl:"T2*強調像",cap:"視床の血腫と脳室内の血液がともに低信号。",
+  les:`<ellipse cx="108" cy="128" rx="13" ry="15" fill="#9a9a9a"/><ellipse cx="108" cy="128" rx="9" ry="11" fill="#0c0c0c"/><path d="${MR_PHR}" fill="#1a1a1a"/>`,
+  ann:[[106,126,6,120,"視床の血腫"],[104,160,6,200,"脳室内の血液"]]});
+addV("sah",{tpl:"head-base",m:"FLAIR",wl:"FLAIR",cap:"本来黒いはずの脳脊髄液（脳溝・脳槽）が FLAIR で高信号。CT で分かりにくい亜急性期にも有用です。",
+  les:p=>SAH_SHAPES("#d0d0d0")+`<ellipse cx="120" cy="151" rx="15" ry="14" fill="${p.gm}"/>`,
+  ann:[[130,108,234,40,"脳槽の高信号"],[168,99,234,70,"シルビウス裂の高信号"]]});
+addV("csdh",{tpl:"head-vent",m:"T1",wl:"T1強調像",o:{shift:6},cap:"CT で等吸収でも、T1 では三日月状の高信号として見えることが多い。",
+  les:p=>ring([120,120,84,98],[110,120,76,98],"#cfcfcf"), ann:[[196,110,234,60,"三日月状の高信号"]]});
+addV("contusion",{tpl:"head-base",m:"T2S",wl:"T2*強調像",cap:"前頭葉底部・側頭葉に点状の低信号（出血）が多発。CT より鋭敏に検出できます。",
+  les:`<ellipse cx="96" cy="56" rx="18" ry="11" fill="#a0a0a0"/><ellipse cx="144" cy="56" rx="14" ry="9" fill="#a0a0a0"/><ellipse cx="66" cy="124" rx="13" ry="16" fill="#a0a0a0"/>${[[90,54],[98,58],[104,52],[142,56],[148,54],[64,120],[70,128],[60,130]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="2.6" fill="#0a0a0a"/>`).join("")}`,
+  ann:[[96,56,6,24,"点状の低信号（出血）"],[66,124,6,170,"周囲の浮腫（高信号）"]]});
+addV("hydro",{tpl:"head-vent",m:"T2",wl:"T2強調像",cap:"拡大した脳室（高信号）と、脳室周囲の帯状の高信号（髄液のしみ出し）。",
+  les:`<path d="M113 74 Q86 86 90 112 L114 110 Q107 92 117 78Z" fill="{csf}" stroke="#9a9a9a" stroke-width="5"/><path d="M127 74 Q154 86 150 112 L126 110 Q133 92 123 78Z" fill="{csf}" stroke="#9a9a9a" stroke-width="5"/><rect x="116" y="110" width="8" height="28" fill="{csf}"/><path d="M110 138 Q92 152 92 174 L106 172 Q106 156 116 144Z" fill="{csf}" stroke="#9a9a9a" stroke-width="4"/><path d="M130 138 Q148 152 148 174 L134 172 Q134 156 124 144Z" fill="{csf}" stroke="#9a9a9a" stroke-width="4"/>`,
+  ann:[[100,94,6,40,"拡大した側脳室"],[148,100,234,60,"脳室周囲の高信号"]]});
+addV("cvst",{tpl:"head-vent",m:"T2S",wl:"T2*強調像",cap:"静脈洞内の血栓が低信号。近くの静脈性梗塞内の出血も低信号です。MR venography（MRV）では静脈洞が描出されません。",
+  les:`<path d="M112 206 L128 206 L120 194Z" fill="#0c0c0c"/><ellipse cx="96" cy="182" rx="12" ry="9" fill="#9a9a9a"/><circle cx="96" cy="182" r="5" fill="#0c0c0c"/>`,
+  ann:[[120,201,234,212,"静脈洞の血栓"],[96,182,6,206,"静脈性梗塞内の出血"]]});
+addV("dai",{tpl:"head-vent",m:"DWI",wl:"DWI（b=1000）",cap:"急性期は脳梁膨大部や皮髄境界の病変が DWI で高信号。",
+  les:`<ellipse cx="120" cy="154" rx="9" ry="4" fill="#e6e6e6"/><circle cx="70" cy="70" r="3" fill="#d0d0d0"/><circle cx="176" cy="80" r="3" fill="#d0d0d0"/>`,
+  ann:[[120,154,234,190,"脳梁膨大部の高信号"],[70,70,6,40,"皮髄境界"]]});
+addV("hsv",{tpl:"head-base",m:"DWI",wl:"DWI（b=1000）",cap:"側頭葉内側が DWI でも高信号。",
+  les:`<path d="M54 120 Q62 106 80 116 Q90 136 76 152 Q60 156 54 140Z" fill="#dedede"/><path d="M180 128 Q174 118 164 124 Q158 138 166 146 Q178 148 180 138Z" fill="#9a9a9a"/>`,
+  ann:[[70,132,6,170,"側頭葉内側の高信号"]]});
+addV("ms",{tpl:"head-vent",m:"T1C",wl:"造影T1強調像",cap:"活動性の病変はリングの一部が欠けた形（オープンリング）に造影されます。",
+  les:`<path d="M138 84 A8 8 0 1 1 150 92" fill="none" stroke="#e0e0e0" stroke-width="2.4"/><ellipse cx="144" cy="152" rx="3" ry="6" transform="rotate(-30 144 152)" fill="#555"/>`,
+  ann:[[144,84,234,40,"オープンリング状の造影"],[144,152,234,190,"造影されない古い病変"]]});
+addV("pres",{tpl:"head-vent",m:"DWI",wl:"DWI（b=1000）",cap:"多くは DWI で等〜淡い高信号（ADC は上昇＝血管性浮腫）。強い高信号で ADC が低下する部分は梗塞化を疑います。",
+  les:`<ellipse cx="84" cy="184" rx="20" ry="14" fill="#6a6a6a"/><ellipse cx="156" cy="184" rx="20" ry="14" fill="#6a6a6a"/><circle cx="160" cy="186" r="4" fill="#e0e0e0"/>`,
+  ann:[[84,184,6,214,"淡い高信号（血管性浮腫）"],[160,186,234,214,"強い高信号（梗塞化の疑い）"]]});
+
+/* ---- 頭頸部 ---- */
+addV("sinusitis",{tpl:"face-max",m:"T2",wl:"T2強調像",cap:"副鼻腔内の液体と肥厚した粘膜は T2 で高信号。眼窩・頭蓋内への波及の評価に MRI が使われます。",
+  les:`<path d="M57 100 L103 100 L102 120 Q100 130 90 130 L66 128 Q56 126 56 116Z" fill="{fluid}"/><path d="M182 70 Q184 60 170 58 L140 62 Q134 64 136 76 L138 120 Q140 130 150 130 L174 128 Q184 126 184 116Z" fill="none" stroke="#c8c8c8" stroke-width="7"/>`,
+  ann:[[80,110,6,40,"液体（高信号）"],[176,90,234,40,"粘膜肥厚（高信号）"]]});
+addV("ica-dissection",{tpl:"neck",m:"T1FS",wl:"脂肪抑制T1強調像（black blood）",cap:"内頸動脈の壁内血腫が三日月状の高信号。内腔は流れのため黒く抜けます。",
+  les:`<circle cx="88" cy="132" r="7" fill="#d6d6d6"/><circle cx="90" cy="130" r="2.6" fill="#0a0a0a"/>`,
+  ann:[[86,134,6,110,"三日月状の壁内血腫"]]});
+
+/* ---- 脊椎 ---- */
+addV("burst-fx",{tpl:"spine-l",m:"T2",wl:"T2強調像 矢状断",cap:"L1 椎体の骨折と後方への骨片の突出で、脊髄円錐が圧迫され内部が高信号（損傷・浮腫）。",
+  les:`<path d="M64 10 L124 10 L124 16 L64 16Z" fill="{soft}"/><rect x="64" y="16" width="60" height="26" fill="#bdbdbd"/><path d="M124 15 Q140 24 124 36Z" fill="#3a3a3a"/><ellipse cx="139" cy="22" rx="3" ry="8" fill="#e6e6e6"/>`,
+  ann:[[94,30,6,40,"骨折した椎体（浮腫）"],[132,25,234,60,"脊柱管内の骨片"],[139,18,234,14,"圧迫された脊髄円錐"]]});
+addV("osteoporotic-fx",{tpl:"spine-l",m:"T1",wl:"T1強調像 矢状断",cap:"新しい骨折の椎体は T1 で低信号（帯状のことが多い）。STIR の高信号と組み合わせて判断します。",
+  les:`<path d="M64 10 L124 10 L64 22Z" fill="{soft}"/><path d="M64 22 L124 11 L124 42 L64 42Z" fill="#5a5a5a" stroke="{bone}" stroke-width="2"/><path d="M64 94 L124 94 L64 102Z" fill="{soft}"/>`,
+  ann:[[94,30,6,40,"T1 低信号（新しい骨折）"],[80,100,6,120,"古い骨折（骨髄信号は正常）"]]});
+addV("spine-mets",{tpl:"spine-l",m:"STIR",wl:"STIR 矢状断",cap:"転移巣は STIR で高信号。T1 の低信号とあわせて評価します。",
+  les:`<ellipse cx="96" cy="68" rx="18" ry="11" fill="#cfcfcf"/><rect x="65" y="137" width="58" height="30" rx="3" fill="#cfcfcf"/><path d="M156 140 L176 138 L190 142 L190 160 L176 166 L156 164Z" fill="#bdbdbd"/>`,
+  ann:[[96,68,6,70,"L2 の転移（高信号）"],[94,152,6,150,"L4 全体が高信号"]]});
+addV("spondylodiscitis",{tpl:"spine-l",m:"T1FS",label:"造影脂肪抑制T1強調像",wl:"造影脂肪抑制T1 矢状断",cap:"椎間板と隣接椎体が造影され、硬膜外・椎体前方の膿瘍は辺縁だけが造影されます。",
+  les:`<rect x="64" y="110" width="60" height="16" fill="#b0b0b0"/><rect x="64" y="136" width="60" height="16" fill="#b0b0b0"/><rect x="66" y="126" width="56" height="10" fill="#d6d6d6"/><path d="M128 120 Q140 131 128 142Z" fill="#2a2a2a" stroke="#e0e0e0" stroke-width="1.6"/><path d="M62 116 Q46 131 62 146Z" fill="#2a2a2a" stroke="#e0e0e0" stroke-width="1.6"/>`,
+  ann:[[94,131,6,150,"造影される椎間板・椎体"],[134,131,234,120,"辺縁が造影される硬膜外膿瘍"],[54,131,6,96,"椎体前方の膿瘍"]]});
+
+/* ---- 骨・関節 ---- */
+addV("pelvic-fx",{tpl:"hip-cor",m:"STIR",wl:"STIR 冠状断",cap:"高齢者の脆弱性骨折では、CT で見えない仙骨の骨折が STIR で縦の高信号として見つかります。",
+  les:`<path d="M128 34 L124 78" stroke="#e6e6e6" stroke-width="4"/><path d="M112 34 L116 78" stroke="#bdbdbd" stroke-width="3"/>`,
+  ann:[[126,56,234,30,"仙骨の骨折（高信号）"],[114,56,6,40,"反対側にも（H 型になることも）"]]});
+addV("tpf",{tpl:"knee-sag",m:"PDFS",wl:"脂肪抑制プロトン密度強調像 矢状断",cap:"陥没部の周囲に骨髄浮腫（高信号）と関節液の貯留。靱帯・半月板損傷の合併も評価します。",
+  les:`<path d="M112 144 L144 144 L140 154 L116 154Z" fill="#3a3a3a"/><ellipse cx="128" cy="168" rx="26" ry="18" fill="#bdbdbd"/><path d="M116 150 L140 150 L138 158 L118 158Z" fill="#9a9a9a"/><path d="M84 30 Q106 56 94 80" stroke="#f0f0f0" stroke-width="7" fill="none"/>`,
+  ann:[[128,170,234,190,"骨髄浮腫"],[128,154,234,150,"陥没した関節面"],[96,56,6,40,"関節液"]]});
+
+/* ---- 腹部・骨盤 ---- */
+addV("cholecystitis",{tpl:"abd-kidney",m:"T2",label:"MRCP（T2強調）",wl:"T2強調像 / MRCP",cap:"胆汁は T2 で高信号。胆嚢頸部の結石は黒い欠損として見え、壁の肥厚・周囲の液体も分かります。",
+  les:`<ellipse cx="86" cy="94" rx="18" ry="22" fill="#9a9a9a"/><ellipse cx="88" cy="94" rx="13" ry="17" fill="{fluid}" stroke="#555" stroke-width="3"/><circle cx="94" cy="108" r="4" fill="#0a0a0a"/>`,
+  ann:[[78,90,6,40,"腫大した胆嚢（高信号の胆汁）"],[94,108,6,130,"結石（欠損）"]]});
+addV("cholangitis",{tpl:"abd-kidney",m:"T2",label:"MRCP（T2強調）",wl:"MRCP",cap:"拡張した総胆管と肝内胆管が白く写り、結石は黒い欠損として見えます。",
+  les:`<circle cx="107" cy="116" r="6" fill="#f0f0f0"/><circle cx="107" cy="116" r="3.2" fill="#0a0a0a"/><path d="M60 92 L76 100 M50 108 L70 108 M64 118 L80 112" stroke="#e6e6e6" stroke-width="2.4"/>`,
+  ann:[[107,116,234,96,"総胆管内の結石（欠損）"],[66,104,6,40,"拡張した肝内胆管"]]});
+addV("hcc",{tpl:"abd-upper",m:"T1",label:"EOB-MRI 肝細胞相",wl:"EOB 造影 MRI 肝細胞相（造影約20分後）",cap:"正常の肝細胞は EOB を取り込んで白くなり、肝細胞癌は取り込まないため黒く抜けます。",
+  les:`<path d="${LIVER_UP}" fill="#bdbdbd"/><circle cx="66" cy="122" r="14" fill="#555"/>`,
+  ann:[[66,122,6,96,"取り込み低下（低信号）"]]});
+addV("liver-abscess",{tpl:"abd-upper",m:"DWI",wl:"DWI（b=800 前後）",cap:"膿瘍の内部が DWI で強い高信号（拡散制限）。",
+  les:`<circle cx="62" cy="130" r="14" fill="#e6e6e6"/>`, ann:[[62,130,6,96,"内部の高信号"]]});
+addV("appendicitis",{tpl:"abd-low",m:"T2",wl:"T2強調像",cap:"妊婦などでは MRI を使います。腫大した虫垂の中の液体と、周囲の高信号（炎症）。",
+  les:`<ellipse cx="80" cy="134" rx="18" ry="22" fill="#8a8a8a"/><g transform="rotate(-25 78 134)"><ellipse cx="78" cy="136" rx="7" ry="14" fill="#e6e6e6" stroke="#2a2a2a" stroke-width="2.5"/></g><circle cx="72" cy="124" r="3" fill="#0a0a0a"/>`,
+  ann:[[80,138,6,150,"腫大した虫垂"],[72,124,6,80,"糞石（無信号）"],[94,140,234,170,"周囲の炎症"]]});
+addV("pyelonephritis",{tpl:"abd-kidney",m:"DWI",wl:"DWI",cap:"造影剤が使えない場合でも、炎症の部分が DWI で楔状の高信号として見えます。",
+  les:`<g transform="rotate(25 176 154)"><path d="M176 132 L190 146 L182 150Z" fill="#d6d6d6"/><path d="M188 158 L178 176 L174 162Z" fill="#d6d6d6"/></g>`,
+  ann:[[184,146,234,110,"楔状の高信号"]]});
+addV("pancreatic-ca",{tpl:"abd-kidney",m:"DWI",wl:"DWI",cap:"膵頭部の腫瘍が DWI で高信号。",
+  les:`<ellipse cx="108" cy="116" rx="11" ry="9" fill="#d6d6d6"/>`, ann:[[108,118,6,140,"腫瘍の高信号"]]});
+addV("psoas-abscess",{tpl:"abd-kidney",m:"STIR",wl:"STIR",cap:"腸腰筋内の膿瘍が強い高信号、周囲の筋も浮腫で淡い高信号。",
+  les:`<ellipse cx="98" cy="174" rx="17" ry="14" fill="#8a8a8a"/><ellipse cx="98" cy="174" rx="11" ry="9" fill="#ececec"/>`,
+  ann:[[98,174,6,214,"膿瘍（高信号）"]]});
+addV("ovarian-torsion",{tpl:"pelvis",m:"T2",wl:"T2強調像",cap:"腫大した卵巣の間質が浮腫で高信号になり、卵胞が辺縁に並びます。ねじれた茎が渦巻き状に見えることもあります。",
+  les:`<ellipse cx="94" cy="128" rx="20" ry="17" fill="#a8a8a8"/>${[[80,122],[84,138],[100,140],[106,120],[92,114]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="3" fill="#f0f0f0"/>`).join("")}<circle cx="110" cy="138" r="6" fill="#555"/><path d="M110 138 m-1.5 0 a1.5 1.5 0 1 1 3 0 a4 4 0 1 1 -8 0" stroke="#1a1a1a" stroke-width="1.4" fill="none"/>`,
+  ann:[[94,128,6,100,"浮腫状に腫大した卵巣"],[110,138,6,170,"ねじれた茎"]]});
+
+</script>
+<script>/* data-quiz.js */
+/* 撮像ポイント問題（techQ）と緊急所見トレーニング（repQ）
+   T(id, 問題, 正解, [誤答3つ], 解説) / R(...) 。既に設定されている症例は上書きしない。
+   R の誤答を省略すると、緊急所見用の共通の誤答を使う。 */
+const URG_WRONG = ["撮影をすべて終えてから報告書にまとめて伝える","よくある所見なので特に伝えない","患者さんに疑われる病名を説明する"];
+const ROUT_WRONG = ["救急対応として、ただちに担当医へ電話で呼び出す","技師の判断で追加の造影検査を行う","患者さんに病名と治療方針を説明する"];
+function T(id,q,ok,wr,exp){ const c = CASES.find(x=>x.id===id); if (c && !c.techQ) c.techQ = {q,opts:[ok,...wr],a:0,exp}; }
+function R(id,q,ok,wr,exp){ const c = CASES.find(x=>x.id===id); if (c && !c.repQ) c.repQ = {q,opts:[ok,...(wr||URG_WRONG)],a:0,exp}; }
+const NOW = "所見として直ちに医師へ伝え、撮影中も患者の状態を観察する";
+
+/* ---- 頭部 ---- */
+R("ich","抗凝固薬を内服中の患者。頭部 CT で被殻に血腫があり、大きな脳室穿破と正中偏位がある。対応は？",NOW,null,"抗凝固薬の中和や手術・ドレナージの判断に関わる所見です。");
+T("lacunar","ラクナ梗塞が疑われる MRI。小さな新しい梗塞を見つけやすくする工夫は？","DWI を薄いスライスや別の断面で追加する",["T1 強調像だけで判断する","スライス厚を厚くして撮る","造影T1 を最初に撮る"],"小さな病変はスライスの隙間に入ると見えません。薄いスライスや冠状断の DWI が有効です（施設の方針で）。");
+R("lacunar","片麻痺で来院。DWI で内包後脚に小さな高信号、FLAIR では白質に古い病変が多数ある。対応は？","症状に合う新しい病変（DWI 高信号）があることを医師へ伝える",["古い病変が多いので年齢相応として伝えない","FLAIR だけで新旧を判断して伝えない","翌週の再検査を予約する"],"新しい梗塞の判定は DWI です。古い病変が多くても、新しい病変は治療方針に直結します。");
+T("thalamic","視床出血の CT で特に確認したい合併所見は？","脳室穿破と脳室の拡大（水頭症）",["副鼻腔の液体貯留","頭皮の厚さ","眼球の形"],"視床は脳室に接しており、脳室穿破から急性水頭症を起こしやすい部位です。");
+R("thalamic","視床出血の経過観察 CT で、前回より側脳室と第3脳室が明らかに拡大している。対応は？","急性水頭症の可能性として直ちに医師へ伝える",["前回と同じ所見として伝えない","次回の経過観察まで待つ","患者さんに水頭症と説明する"],"急性水頭症は脳室ドレナージなど緊急処置の対象になりえます。");
+T("cerebellar-h","後頭蓋窩の出血を CT で評価するときの注意点は？","錐体骨の間はビームハードニングで見えにくいので、薄いスライスや再構成で確認する",["肺野条件で観察する","骨条件だけで評価する","スライス厚を厚くする"],"後頭蓋窩は厚い骨に挟まれ、黒い帯状のアーチファクトが出やすい部位です。");
+T("pontine-h","橋出血の患者を撮影するときに最も注意すべきことは？","呼吸状態が不安定なことが多いので、気道・モニターを確認しながら短時間で撮る",["正確な位置決めのため何度も撮り直す","一人で患者を寝台に移す","技師の判断で造影を追加する"],"脳幹の出血は呼吸・循環が急に悪化しうるため、安全確認と時間短縮が最優先です。");
+R("pontine-h","意識障害の患者の CT で橋に高吸収。撮影中に呼吸が浅く不規則になってきた。対応は？","撮影を中断してでも直ちに医師・看護師を呼ぶ",["撮影を最後まで終えてから伝える","声をかけて様子を見る","体位を変えて呼吸を楽にさせ撮影を続ける"],"呼吸の変化は脳幹の障害の進行を示します。画像より患者の安全が優先です。");
+T("edh","硬膜外血腫が疑われる外傷患者で、骨折線を確認する方法として適切なのは？","骨条件・薄いスライス・3D 再構成で確認する",["脳条件だけで確認する","造影 MRI を追加する","肺野条件で確認する"],"側頭骨骨折は中硬膜動脈損傷と関係します。骨条件と 3D 再構成が有用です。");
+R("edh","頭部打撲後、意識がはっきりしている若年者。CT で側頭部に凸レンズ型の高吸収がある。対応は？","意識が清明でも急変しうるため直ちに医師へ伝える",["意識清明なので経過観察でよいと判断する","帰宅してよいと伝える","翌日の読影を待つ"],"硬膜外血腫は「意識清明期」のあとに急速に悪化することがあります。");
+T("csdh","等吸収の慢性硬膜下血腫を見逃さないための見方は？","脳溝が頭蓋骨の内側まで届いているか、正中偏位がないかを確認する",["骨条件で観察する","肺野条件で観察する","必ず造影 CT を追加する"],"血腫が脳と同じ濃度だと境界が見えません。脳溝の消失や偏位が手がかりです。");
+R("csdh","歩行障害の高齢者。CT で片側の脳溝が見えず、脳表に等吸収の三日月状の領域と正中偏位がある。対応は？","慢性硬膜下血腫の可能性として医師へ伝える",["脳萎縮として伝えない","年齢相応の変化と判断する","画質不良として撮り直す"],"慢性硬膜下血腫は手術（穿頭）で改善が期待できる疾患です。");
+T("contusion","前頭葉底部の脳挫傷を見つけやすくする工夫は？","冠状断・矢状断の再構成で頭蓋底に接する部分を見る",["横断像だけを厚いスライスで見る","肺野条件で観察する","撮像範囲を頭頂部だけにする"],"前頭葉底部は頭蓋底の骨の近くでアーチファクトも出やすく、横断像だけでは見逃しやすい部位です。");
+R("contusion","前日入院した脳挫傷の経過観察 CT。挫傷内の出血が拡大し、新たに正中偏位が出現した。対応は？",NOW,null,"脳挫傷は時間とともに拡大することがあり、悪化は手術の判断につながります。");
+T("dai","びまん性軸索損傷の評価に最も鋭敏な撮像法は？","T2*強調像や SWI",["単純 CT","T1 強調像","造影 CT"],"微小出血は磁化率の効果で T2*/SWI に黒く写ります。CT ではほとんど見えません。");
+R("dai","交通外傷後、意識障害が続く患者。頭部 CT では明らかな異常がない。対応は？","CT で説明のつかない意識障害であることを医師と共有する（MRI の検討につながる）",["CT が正常なので問題ないと判断する","患者さんに異常なしと説明する","撮影条件を変えて CT を何度も撮り直す"],"びまん性軸索損傷は CT で写りにくく、MRI で初めて分かることが多い損傷です。");
+T("skull-fx","頭蓋底骨折を評価するのに有用な再構成は？","骨条件の薄いスライスで冠状断・矢状断を作る",["脳条件の横断像だけを見る","5mm の厚いスライスで再構成する","肺野条件で観察する"],"頭蓋底は複雑な形をしており、横断像だけでは骨折線が分かりにくい部位です。");
+R("skull-fx","頭部外傷の CT で、頭蓋内に小さな空気（気脳症）がある。対応は？","硬膜損傷や開放性骨折を示唆するため医師へ伝える",["アーチファクトとして伝えない","正常変異として伝えない","患者さんに骨折と説明する"],"頭蓋内の空気は副鼻腔や乳突蜂巣の骨折、開放性骨折のサインです。");
+T("hydro","シャント術後の患者を MRI で撮像するときに注意すべきことは？","圧可変式バルブは磁場で設定が変わることがあるので、撮像後の確認を医師と共有する",["シャントはすべて MRI 禁忌なので撮らない","特に確認することはない","撮像前にバルブを外してもらう"],"機種によっては MRI 後に設定圧の確認・再設定が必要です。");
+R("hydro","シャント術後の患者が頭痛と嘔吐。前回の CT より側脳室が明らかに拡大している。対応は？","シャント不全の可能性として直ちに医師へ伝える",null,"シャント不全による急性水頭症は緊急処置が必要になることがあります。");
+T("gbm","脳腫瘍の造影 MRI で、造影前後を比べやすくするために大切なことは？","造影前後で同じ断面・スライス位置・撮像条件にそろえる",["造影後は別の断面で撮る","造影後だけ撮る","造影前の撮像は省略する"],"造影効果は造影前との比較で判断します。条件がそろっていないと比べられません。");
+R("gbm","頭痛で来院。MRI で大きな腫瘤と強い浮腫、正中偏位があり、撮影中に呼びかけへの反応が鈍くなってきた。対応は？","脳ヘルニアのリスクとして直ちに医師へ伝える",null,"意識レベルの低下は脳ヘルニアが進んでいるサインです。");
+T("brain-mets","小さな脳転移を見つけやすくする撮像は？","薄いスライスの 3D 造影T1 強調像",["厚いスライスの 2D T2 強調像","単純 CT","造影なしの FLAIR だけ"],"小病変は薄いスライスの 3D 撮像で検出しやすくなり、治療方針（定位放射線治療など）にも影響します。");
+R("brain-mets","肺癌の患者。脳 MRI で多発する造影結節の一つに出血と強い浮腫、正中偏位がある。対応は？","出血と正中偏位を伴う所見として医師へ速やかに伝える",null,"腫瘍内出血や強い浮腫は急な神経症状の悪化につながります。");
+T("meningioma","髄膜腫の石灰化を評価するのに適した検査は？","CT",["T2 強調像","拡散強調像","MRA"],"石灰化は CT で白く明瞭に写ります。MRI では分かりにくいことがあります。");
+R("meningioma","健診の MRI で偶然、硬膜に接する小さな均一に造影される腫瘤。患者さんは無症状。対応は？","通常の読影依頼の流れで報告する",ROUT_WRONG,"無症状の小さな髄膜腫は通常は待機的な所見です。良性・悪性などを技師から患者さんに伝えることはしません。");
+T("abscess","リング状に造影される脳病変を見たとき、追加を検討すべき撮像は？","拡散強調像（DWI）",["MRA","T1 強調像だけ","造影CT"],"膿瘍は内部が DWI で高信号になり、腫瘍の壊死と区別する手がかりになります。");
+R("abscess","発熱と頭痛の患者。脳にリング状造影病変があり、DWI で側脳室内にも高信号がある。対応は？","脳室穿破の可能性として直ちに医師へ伝える",null,"脳膿瘍の脳室穿破は重篤な合併症です。");
+T("hsv","発熱と意識障害でヘルペス脳炎が疑われるとき、特に重要な撮像は？","FLAIR と DWI",["MRA だけ","頸椎の T2 強調像","単純 CT だけで十分"],"側頭葉内側の FLAIR・DWI 高信号が早期診断の手がかりです。CT は初期に正常なことが多い。");
+R("hsv","発熱・異常行動の患者。MRI で側頭葉内側に FLAIR 高信号がある。対応は？","早期治療につながる所見として速やかに医師へ伝える",null,"ヘルペス脳炎は抗ウイルス薬の開始が早いほど予後がよくなります。");
+T("ms","多発性硬化症で脳梁の病変を評価するのに適した撮像は？","矢状断の FLAIR",["冠状断の T1 強調像","横断の DWI だけ","MRA"],"脳梁の病変は脳室に接していて横断では分かりにくく、矢状断 FLAIR が有用です。");
+R("ms","経過観察中の多発性硬化症の患者。造影 MRI で新たに造影される病変がある。対応は？","新しい活動性病変として担当医に確実に伝わるようにする",["病変数が多いので特に伝えない","患者さんに再発と説明する","技師の判断で撮像を追加し続ける"],"造影される新病変は活動性を示し、治療変更の判断材料になります。");
+T("cvst","脳静脈洞血栓症の評価で造影のタイミングとして適切なのは？","静脈相（CT venography / MR venography）",["早期の動脈相だけ","造影はしない","造影 10 分後だけ"],"静脈洞の造影欠損を見るには、静脈が十分に造影される時相で撮ります。");
+R("cvst","若年女性の頭痛。CT で上矢状静脈洞が三角形の高吸収で、近くに動脈の支配に合わない出血がある。対応は？","脳静脈洞血栓症の可能性として医師へ伝える",null,"静脈洞血栓症は見逃されやすく、抗凝固療法などの治療につながります。");
+T("pres","妊娠中・産褥期の女性で PRES が疑われるときの注意点は？","妊娠の有無を確認し、造影剤を使うかどうかは医師の判断を確認する",["必ず造影 MRI を行う","妊娠の確認は不要","CT だけで十分"],"妊娠中は造影剤の使用を慎重に判断します。");
+R("pres","産褥期の女性がけいれん。MRI で両側後頭葉に高信号があり、一部で ADC が低下している。対応は？","梗塞化の可能性を含めて医師へ伝える",null,"ADC 低下は可逆性の浮腫から梗塞に進んでいる可能性を示します。");
+
+/* ---- 頭頸部 ---- */
+T("sinusitis","副鼻腔の自然口（排泄路）を評価するのに適した再構成は？","骨条件の冠状断",["脳条件の横断","肺野条件","MIP 画像"],"自然口（OMC）の閉塞は冠状断でよく分かります。");
+R("sinusitis","副鼻腔炎の患者が眼の腫れと視力低下を訴える。CT で眼窩内に辺縁が造影される液体貯留がある。対応は？","眼窩内膿瘍の可能性として直ちに医師へ伝える",null,"眼窩内への波及は視力障害を起こしうる緊急の合併症です。");
+T("blowout","眼窩下壁の骨折を評価するために必須の再構成は？","冠状断",["横断のみ","肺野条件","厚いスライスの横断"],"下壁は横断像と平行で、冠状断でないと骨折や筋の逸脱が分かりません。");
+R("blowout","小児の顔面打撲。嘔気と眼球運動の制限があり、CT で下壁の骨折は目立たないが下直筋が上顎洞側に入り込んでいるように見える。対応は？","筋の嵌頓（trapdoor 型）の可能性として直ちに医師へ伝える",null,"若年者の閉鎖型骨折は骨折が目立たなくても筋が挟まり、早期手術が必要なことがあります。");
+T("pta","扁桃周囲膿瘍の患者を撮影するときに注意すべきことは？","仰臥位で呼吸が苦しくなることがあるので、体位を工夫し気道を観察する",["長い息止めをしてもらう","頸部を強く伸展させる","患者を一人で待たせる"],"咽頭の腫れで仰臥位になると気道が狭くなることがあります。");
+R("pta","扁桃周囲膿瘍疑いの造影 CT で、膿瘍が副咽頭間隙から縦隔の方向へ広がっている。対応は？","深頸部・縦隔への進展として直ちに医師へ伝える",null,"縦隔への進展（降下性壊死性縦隔炎）は命に関わります。");
+T("rpa","咽後膿瘍が疑われるとき、撮像範囲として適切なのは？","頭蓋底から縦隔まで",["中咽頭のレベルだけ","頭部だけ","鎖骨の上まで"],"咽頭後間隙は縦隔へつながっており、下方への進展を確認します。");
+R("rpa","咽後膿瘍の患者が CT 台の上で息苦しさを訴え、喘鳴が出てきた。対応は？","撮影を中断して医師を呼び、患者の楽な姿勢を保つ",["撮影を最後まで終える","深呼吸を繰り返してもらう","首を強く反らせて気道を広げる"],"気道狭窄の進行は窒息につながります。画像より気道確保が優先です。");
+T("ica-dissection","頸動脈解離の壁内血腫を見つけやすい MRI の撮像は？","脂肪抑制T1 強調像（black blood）",["拡散強調像","頭部の FLAIR だけ","T2*強調像"],"壁内血腫は脂肪抑制T1 で三日月状の高信号として写ります。");
+R("ica-dissection","若年者の脳梗塞。頸部 CTA で内頸動脈の内腔が細く偏在し、壁が三日月状に厚い。対応は？","頸動脈解離の可能性として医師へ伝える",null,"若年者の脳梗塞では解離が重要な原因で、治療方針に関わります。");
+T("epiglottitis","急性喉頭蓋炎が疑われる患者の CT 撮影について正しいのは？","撮影の可否と体位は医師が判断し、撮影時は医師の同席と気道確保の準備をする",["必ず仰臥位で長めに撮る","技師だけで撮影する","頸部を強く伸展させる"],"仰臥位で急に気道が閉塞することがあり、窒息のリスクがある疾患です。");
+R("epiglottitis","喉頭蓋炎疑いの患者を撮影中、流涎が増えて呼吸が苦しそうになった。対応は？","ただちに撮影を中止して医師を呼ぶ",["撮影を最後まで終える","仰臥位のまま待ってもらう","水を飲んでもらう"],"気道閉塞が差し迫っているサインです。");
+
+/* ---- 脊椎 ---- */
+T("lhnp","腰椎椎間板ヘルニアの横断像の設定として適切なのは？","矢状断で高位を確認し、該当する椎間板に平行に設定する",["常に寝台に垂直に設定する","冠状断だけで評価する","高位を確認せず等間隔で撮る"],"椎間ごとに角度が違うため、椎間板に平行な横断が正確な評価につながります。");
+R("lhnp","腰痛と下肢痛の患者。MRI で巨大なヘルニアが馬尾を強く圧迫しており、問診で排尿障害がある。対応は？","馬尾症候群の可能性として速やかに医師へ伝える",null,"馬尾症候群は早期の手術が必要になることがあります。");
+T("lss","腰部脊柱管狭窄症で狭窄の程度を評価しやすい撮像は？","各椎間に平行な T2 横断像",["T1 の冠状断だけ","拡散強調像","必ず造影を行う"],"硬膜嚢の断面積は T2 横断で評価します。");
+R("lss","外来の脊柱管狭窄症疑いの患者。MRI で多椎間に中等度の狭窄があり、症状は以前と変わらない。対応は？","通常の読影依頼の流れで報告する",ROUT_WRONG,"症状の変化がない慢性の狭窄は待機的な所見です。");
+T("osteoporotic-fx","椎体骨折が新しいか古いかを判断するのに有用な撮像は？","STIR（脂肪抑制T2）の矢状断",["T2*強調像だけ","頭部の拡散強調像","MRA"],"新しい骨折は骨髄浮腫で STIR 高信号になります。");
+R("osteoporotic-fx","圧迫骨折疑いの高齢者。MRI で椎体後壁が脊柱管内に突出し、下肢の脱力を訴えている。対応は？","神経症状を伴う脊柱管狭窄として医師へ伝える",null,"後壁の突出による神経圧迫は手術の検討につながります。");
+T("burst-fx","脊椎損傷が疑われる外傷患者の移動で正しいのは？","複数人で体の軸をそろえて移動する（ログロール）",["一人で引っ張って移す","座らせて移動する","腰を曲げて寝台に乗せる"],"不安定な骨折では体位の変化で脊髄損傷が悪化しえます。");
+R("burst-fx","外傷 CT で L1 の破裂骨折があり、骨片が脊柱管に大きく突出している。対応は？",NOW,null,"脊柱管内の骨片は神経障害の原因になり、手術を考える所見です。");
+T("spondylodiscitis","化膿性脊椎炎で硬膜外膿瘍を評価するのに有用な撮像は？","造影脂肪抑制T1 強調像（医師の判断で）",["T2*強調像だけ","単純 CT だけ","MRA"],"膿瘍の壁が造影され、範囲がはっきりします。");
+R("spondylodiscitis","化膿性脊椎炎の患者。MRI で硬膜外膿瘍が脊髄を圧迫し、下肢の脱力が出ている。対応は？",NOW,null,"脊髄圧迫は緊急手術の対象になりえます。");
+T("spine-mets","脊椎転移のスクリーニングで骨髄の置換を見つけやすい撮像は？","T1 強調像の矢状断",["T2*強調像の横断","頭部の拡散強調像","MRA"],"脂肪を含む骨髄は T1 で明るく、腫瘍に置き換わると黒く見えます。");
+R("spine-mets","癌の患者の背部痛。MRI で転移による硬膜外腫瘍が脊髄を圧迫し、最近歩きにくいという。対応は？","脊髄圧迫として速やかに医師へ伝える",null,"麻痺が完成する前の治療（放射線・手術）が重要です。");
+T("cspine-fx","頸椎損傷が疑われる患者の撮影で正しいのは？","頸椎カラーを外さず、軸を保って複数人で移動する",["位置合わせのためカラーを外す","頸部を左右に回して位置を合わせる","座位で撮影する"],"不安定な頸椎損傷では、わずかな動きで脊髄損傷が悪化します。");
+R("cspine-fx","外傷 CT で C5 の前方すべりと椎前軟部組織の腫脹がある。対応は？",NOW,null,"脱臼骨折は脊髄損傷・呼吸障害につながりうる所見です。");
+T("ccs","骨折のない頸部外傷で四肢のしびれがある患者について正しいのは？","CT が正常でも脊髄損傷がありうるので、MRI の検討につながる情報として共有する",["CT が正常なら問題ない","しびれは関係ないので伝えない","頸部を動かして痛みを確認する"],"高齢者では頸椎症の狭窄部で、骨折がなくても脊髄が損傷されることがあります。");
+R("ccs","転倒して顔面を打った高齢者。CT で骨折はないが、上肢のしびれと脱力を訴えている。対応は？","非骨傷性頸髄損傷の可能性として医師へ伝える（MRI の検討）",["骨折がないので帰宅してよいと伝える","しびれは年齢のためと説明する","頸椎カラーを外して可動域を確認する"],"手の症状が目立つのは中心性頸髄損傷の特徴です。");
+T("seh","突然の首の激痛に続いて片麻痺が出た患者。頭部 CT は正常だった。考えるべきことは？","脊髄硬膜外血腫の可能性もあり、脊髄 MRI の検討を医師と共有する",["脳梗塞以外は考えなくてよい","異常なしとして終了する","頭部 CT を繰り返す"],"脊髄硬膜外血腫は片麻痺で発症し、脳卒中と間違われることがあります。");
+R("seh","頸椎 MRI で脊柱管の後方に血腫があり、脊髄を圧迫している。対応は？",NOW,null,"緊急の除圧手術の対象になりうる所見です。");
+
+/* ---- 骨・関節 ---- */
+T("pelvic-fx","骨盤骨折の外傷 CT で活動性出血を評価するのに必要な時相は？","動脈相と静脈相（門脈相）",["単純 CT だけ","造影 10 分後だけ","骨条件だけ"],"動脈相での造影剤漏出が塞栓術の判断材料になります。");
+R("pelvic-fx","骨盤骨折の外傷 CT（動脈相）で、骨盤内に造影剤の血管外漏出がある。対応は？","活動性出血として直ちに医師へ伝える（塞栓術の判断につながる）",null,"骨盤骨折の出血は出血性ショックの原因になります。");
+T("fnf","X 線で骨折が見えない高齢者の股関節痛で有用な検査は？","MRI（T1・STIR の冠状断）",["何もしない","頭部 CT","胸部 X 線"],"不顕性骨折は MRI で骨折線や骨髄浮腫として見つかります。");
+R("fnf","転倒後の股関節痛。CT で大腿骨頸部に転位のある骨折がある。対応は？","骨折の所見として速やかに医師へ伝える",["歩いて帰ってよいと伝える","報告書だけで済ませ連絡しない","患者さんに手術が必要と説明する"],"高齢者の大腿骨近位部骨折は早期の手術が勧められています。");
+T("onfh","大腿骨頭壊死の早期診断に最も有用な撮像は？","両側の股関節を含む冠状断 T1 強調像",["単純 X 線だけ","CT の横断だけ","拡散強調像"],"帯状の低信号（band pattern）は T1 で最もよく見えます。両側性が多い疾患です。");
+R("onfh","ステロイド治療中の患者の股関節 MRI。両側の骨頭に帯状の低信号があり、圧潰はない。対応は？","通常の読影依頼の流れで報告する",ROUT_WRONG,"圧潰のない骨頭壊死は待機的な所見です。");
+T("acl","前十字靱帯を評価しやすい撮像断面は？","前十字靱帯の走行に平行な斜矢状断",["横断だけ","冠状断だけ","厚いスライスの矢状断"],"靱帯全長を一枚に収めると連続性の判断がしやすくなります。");
+R("acl","スポーツ外傷の膝 MRI で前十字靱帯断裂と骨挫傷がある。患者の状態は安定している。対応は？","通常の読影依頼の流れで報告する",ROUT_WRONG,"靱帯損傷は待機的に治療方針を決めることが多い所見です。");
+T("meniscus","半月板を評価するときのスライス厚の目安は？","3mm 前後の薄いスライス",["10mm","7mm","スライス厚は関係ない"],"半月板は小さな構造で、厚いスライスでは断裂が見えにくくなります。");
+R("meniscus","膝 MRI で半月板の一部が顆間部に転位（バケツ柄断裂）し、膝が伸びない（ロッキング）。対応は？","早めの治療が必要になりうる所見として担当医に確実に伝える",["変性として伝えない","患者さんに膝を強く伸ばしてもらう","次回受診まで伝えない"],"ロッキングを伴うバケツ柄断裂は早期の手術が検討されます。");
+T("tpf","脛骨高原骨折の手術計画に役立つ再構成は？","薄いスライスの MPR（矢状断・冠状断）と 3D 再構成",["5mm の横断だけ","肺野条件","造影 MRI"],"陥没の深さや骨片の位置は多方向の再構成で評価します。");
+R("tpf","膝外傷の CT で脛骨高原骨折があり、下腿が著しく腫れて強い痛みを訴えている。対応は？","コンパートメント症候群の可能性も含めて医師へ伝える",null,"コンパートメント症候群は緊急の減張切開が必要になることがあります。");
+T("rcuff","腱板（棘上筋腱）を評価するための斜冠状断の設定は？","棘上筋腱の走行に平行に設定する",["体軸に垂直に設定する","鎖骨に平行に設定する","任意の角度でよい"],"腱の走行に合わせると、付着部の断裂が一枚で評価できます。");
+R("rcuff","肩痛の外来患者。MRI で棘上筋腱の全層断裂がある。対応は？","通常の読影依頼の流れで報告する",ROUT_WRONG,"腱板断裂は通常、待機的な所見です。");
+
+/* ---- アーチファクト ---- */
+T("art-metal","CT の金属アーチファクトを減らす方法として適切なのは？","金属アーチファクト低減処理（MAR）の再構成を使う",["管電圧を下げる","何もせず撮る","造影剤を増やす"],"MAR 再構成、管電圧を上げる、仮想単色X線画像（高 keV）などが有効です。");
+R("art-metal","人工股関節の患者の骨盤 CT で、アーチファクトのため膀胱周囲が評価できない。対応は？","評価できない領域があることを医師に伝え、MAR 再構成などの対応を相談する",["何も伝えずに終える","病変として報告する","技師の判断で MRI を撮る"],"評価できない範囲を共有することで、見逃しを防げます。");
+T("art-bh","ビームハードニングで生じやすい所見は？","厚い骨に挟まれた部位の黒い帯",["位相方向のゴースト","範囲外の構造の折り返し","脂肪と水の境界の白黒の帯"],"X 線が骨を通ると硬くなり、CT 値が低く計算されます。");
+R("art-bh","頭部 CT で両側の錐体骨の間に、橋を横切る黒い帯がある。神経症状はない。対応は？","アーチファクトの可能性が高いが、病変と区別に迷えば医師に相談する",["橋梗塞として緊急連絡する","必ず何度も撮り直す","患者さんに異常と説明する"],"典型的な部位のアーチファクトですが、迷ったときは共有するのが安全です。");
+T("art-motion","MRI の体動アーチファクトについて正しいのは？","ゴーストは位相エンコード方向に出る",["ゴーストは周波数エンコード方向に出る","CT では起こらない","磁場が弱いほど強く出る"],"位相方向を変えることで、病変にゴーストがかからないよう工夫できます。");
+R("art-motion","不穏な患者の頭部 MRI。拡散強調像が体動でほとんど評価できない。対応は？","診断に支障があることを医師に伝え、再撮像や鎮静の要否を相談する",["そのまま検査を終える","技師の判断で鎮静薬を使う","患者さんを強く押さえつけて撮る"],"評価できない画像のまま終えると見逃しにつながります。");
+T("art-susc","磁化率アーチファクトを減らす工夫として正しいのは？","スピンエコー系を使い、受信バンド幅を広げる",["グラジエントエコーにする","エコー時間を長くする","より高磁場の装置を使う"],"グラジエントエコーや EPI、高磁場ほど磁化率アーチファクトは強くなります。");
+R("art-susc","脳梗塞疑いの MRI。歯科金属のアーチファクトで拡散強調像の前頭葉底部が評価できない。対応は？","評価できない範囲を医師に伝え、撮像法の変更を相談する",["そのまま正常として終える","前頭葉の梗塞として報告する","歯科金属を外すよう患者に求める"],"マルチショット EPI など別の撮像で改善できることがあります。");
+T("art-chem","化学シフトアーチファクトを減らす方法は？","受信バンド幅を広げる",["受信バンド幅を狭くする","磁場を上げる","FOV を小さくする"],"バンド幅を広げると、脂肪と水の位置ずれ（ピクセル数）が小さくなります。");
+R("art-chem","腎臓の縁に沿って片側が黒、反対側が白の帯がある。対応は？","化学シフトの可能性を考え、病変と迷う場合は脂肪抑制や周波数方向の変更を検討し、必要なら医師と共有する",["腎被膜の病変として緊急連絡する","必ず造影を追加する","何も考えずに終える"],"周波数方向にずれる帯は化学シフトの典型像です。");
+T("art-alias","折り返しアーチファクトの対策として正しいのは？","FOV を広げる、位相方向のオーバーサンプリングを使う",["FOV を狭くする","スライスを厚くする","加算回数を減らす"],"範囲外の信号が反対側に重なるのが原因です。");
+R("art-alias","腹部 MRI で腕が画像の反対側に重なり、肝臓にかかっている。対応は？","位相方向や FOV を調整して撮り直しを検討する",["肝臓の病変として報告する","そのまま終える","造影を追加する"],"重なった部分は評価できないため、撮像条件の修正が必要です。");
+
+/* ---- 胸部 ---- */
+T("dissection-b","B 型解離の造影 CT で、腹部臓器の血流障害を評価するために大切なことは？","腹部・腸骨動脈まで撮像し、腸管や腎臓の造影を確認する",["胸部だけを撮る","単純 CT だけで終える","肺野条件で観察する"],"臓器虚血の有無は治療方針（血管内治療）を左右します。");
+R("dissection-b","B 型解離の患者。造影 CT で腸管壁の造影不良と、片側の腎臓の造影不良がある。対応は？","臓器虚血を伴う解離として直ちに医師へ伝える",null,"臓器虚血を伴う B 型解離（complicated）は緊急治療の対象です。");
+T("taa","胸部大動脈瘤の切迫破裂の徴候（壁在血栓内の三日月状高吸収）を評価するのに必要なのは？","単純 CT を撮る",["造影 CT だけを撮る","肺野条件で観察する","遅延相だけを撮る"],"造影すると三日月状の高吸収が造影された内腔と区別しにくくなります。");
+R("taa","胸背部痛の高齢者。単純 CT で大動脈瘤の壁在血栓内に三日月状の高吸収と左胸水がある。対応は？","切迫破裂の可能性として直ちに医師へ伝える",null,"切迫破裂は緊急手術の対象になります。");
+T("ptx","CT で気胸を見落とさないための見方は？","肺野条件で、仰臥位で空気がたまりやすい前胸部をよく見る",["縦隔条件だけで見る","背側だけを見る","骨条件で見る"],"仰臥位では空気は前方にたまり、縦隔条件では肺と区別しにくくなります。");
+T("hemothorax","胸水が血液かどうかを判断する手がかりとして、技師ができることは？","CT 値を ROI で測定する",["ウィンドウ幅を狭くする","骨条件で見る","何もしない"],"血液は通常の胸水より CT 値が高くなります。");
+R("hemothorax","外傷 CT で右胸腔に高吸収の液体が大量にあり、動脈相で胸壁の血管から造影剤が漏れている。対応は？","活動性出血として直ちに医師へ伝える",null,"大量血胸と活動性出血は止血処置が必要です。");
+T("rib-fx","多発肋骨骨折の本数を数えやすい再構成は？","骨条件の 3D 再構成（肋骨展開像など）",["縦隔条件の横断だけ","肺野条件","脳条件"],"肋骨は斜めに走るため、横断だけでは数え間違いが起こりやすい構造です。");
+R("rib-fx","胸部打撲の CT で、肋骨骨折に加えて気胸が見つかった。対応は？","気胸の合併として医師へ伝える",null,"気胸は人工呼吸や搬送で悪化しうるため共有が必要です。");
+T("lobar-pneumonia","肺炎の CT で用意したい再構成は？","肺野条件と縦隔条件の両方",["肺野条件だけ","骨条件だけ","脳条件"],"肺野条件で陰影、縦隔条件で胸水・膿胸・リンパ節を評価します。");
+R("lobar-pneumonia","肺炎の患者の CT で、浸潤影に加えて辺縁が造影される胸水がある。対応は？","膿胸の可能性として医師へ伝える",null,"膿胸はドレナージが必要になることがあります。");
+T("aspiration","誤嚥性肺炎の患者の撮影で注意すべきことは？","嘔吐・誤嚥に備えて体位と吸引の準備をする",["長く息止めをしてもらう","頭を低くして撮る","食事をとってから撮る"],"撮影中の嘔吐で再び誤嚥する危険があります。");
+R("aspiration","誤嚥性肺炎疑いの CT で、右主気管支内に固形物のような異物がある。対応は？","気道異物として医師へ伝える",null,"気道異物は気管支鏡での除去が必要です。");
+T("ip","間質性肺炎の背側の陰影が重力によるものかを区別するための工夫は？","腹臥位での撮影を追加する",["呼気だけで撮る","造影する","厚いスライスで再構成する"],"重力による陰影は腹臥位で消えます。");
+R("ip","間質性肺炎の患者。前回の CT になかった広いすりガラス影が両肺に新たに出ている。対応は？","急性増悪の可能性として速やかに医師へ伝える",null,"急性増悪は死亡率の高い病態で、早期治療が必要です。");
+T("viral-pneumonia","感染症（COVID-19 など）が疑われる患者を撮影するときに必要なことは？","施設の感染対策に従い、撮影後に装置・寝台を清拭する",["特別なことは必要ない","マスクを外して説明する","他の患者と同じ待合で待たせる"],"検査室を介した院内感染を防ぎます。");
+R("viral-pneumonia","発熱患者の CT で両側の末梢に多発するすりガラス影がある。対応は？","所見を医師に伝え、施設の感染対策（隔離・清拭）の手順に従う",["所見は伝えず清掃だけする","患者さんに COVID-19 と説明する","次の患者をすぐ入れる"],"診断は医師が行いますが、感染対策は所見に気づいた時点から始めます。");
+T("tb","結核が疑われる患者の撮影で正しいのは？","空気感染対策（N95 マスク、換気、検査順の調整）を行う",["標準予防策だけでよい","サージカルマスクを患者から外す","混雑した時間に撮る"],"結核は空気感染します。疑いの段階から対策が必要です。");
+R("tb","一般外来の胸部 CT で、上葉に空洞と tree-in-bud がある。対応は？","結核の可能性があるため、感染対策のためにも早めに医師へ伝える",["待機的な所見として通常の流れだけで済ませる","患者さんに結核と説明する","所見は伝えず換気だけする"],"結核の疑いは周囲への感染防止のため早めの共有が大切です。");
+T("lung-ca","肺結節を経過観察する CT で大切なことは？","前回と同じ撮影条件・スライス厚・再構成関数にそろえる",["毎回条件を変える","厚いスライスで再構成する","肺野条件は使わない"],"条件が違うと大きさやすりガラス成分の比較が不正確になります。");
+R("lung-ca","健診 CT で 2cm のスピキュラを伴う結節。患者さんは無症状。対応は？","通常の読影依頼の流れで報告する",ROUT_WRONG,"重要な所見ですが緊急ではありません。技師から患者さんに病名を伝えることはしません。");
+T("copd","COPD で酸素投与中の患者を撮影するときに正しいのは？","酸素流量は医師の指示どおりにし、技師の判断で変えない",["苦しそうなら酸素を増やす","撮影中は酸素を外す","酸素マスクを外して息止めをしてもらう"],"COPD では高濃度酸素で CO2 がたまることがあります。");
+R("copd","COPD の患者の CT で、新たに片側の気胸がある。対応は？","気胸として医師へ伝える",null,"COPD の気胸は呼吸状態が急に悪くなりやすい合併症です。");
+T("pulm-edema","心原性肺水腫で呼吸困難が強い患者の撮影で注意することは？","仰臥位で悪化しやすいので撮影時間を短くし、状態を観察する",["長い息止めをしてもらう","頭を低くして撮る","撮影中は目を離す"],"仰臥位で肺うっ血が悪化し、急に呼吸状態が崩れることがあります。");
+R("pulm-edema","呼吸困難の患者を CT 台に寝かせたところ、SpO2 が下がり起き上がろうとする。対応は？","撮影を中断して医師・看護師を呼ぶ",["撮影を急いで終える","押さえて仰臥位を保つ","酸素を外して息止めさせる"],"画像より患者の安全が優先です。");
+T("effusion","被包化された胸水の特徴は？","体位を変えても動かず、レンズ状の形になりやすい",["必ず三日月状になる","CT 値が必ず高い","空気を必ず含む"],"被包化は膿胸などを示唆し、ドレナージ計画に関わります。");
+R("effusion","片側の大量胸水で、縦隔が反対側へ偏位している。対応は？","大量胸水による縦隔偏位として医師へ伝える",null,"呼吸・循環に影響しうるため、ドレナージが検討されます。");
+T("pericardial","心嚢液が血液かどうかを推測するために技師ができることは？","CT 値を測定する",["ウィンドウを狭くする","肺野条件で見る","何もしない"],"血性の心嚢液は CT 値が高く、解離・心破裂などを示唆します。");
+R("pericardial","大動脈解離疑いの造影 CT で、新たに心嚢液が出現している。対応は？","心タンポナーデのリスクとして直ちに医師へ伝える",null,"解離に伴う心嚢液は急変の前触れになりえます。");
+T("pneumomediastinum","縦隔気腫の空気を見やすくする表示は？","肺野条件",["脳条件","骨条件だけ","狭いウィンドウ"],"縦隔の脂肪と空気は縦隔条件では区別しにくいことがあります。");
+R("pneumomediastinum","激しい嘔吐のあとの胸痛。CT で縦隔気腫に加え、食道周囲の液体と左胸水がある。対応は？","食道破裂の可能性として直ちに医師へ伝える",null,"食道破裂は時間とともに縦隔炎が進む緊急疾患です。");
+T("boerhaave","食道破裂疑いで経口造影剤を使うときに正しいのは？","使うかどうかと造影剤の種類（水溶性）は医師の指示に従う",["技師の判断でバリウムを飲ませる","造影剤を大量に一気に飲ませる","仰臥位で急いで飲ませる"],"漏れた場合に縦隔・胸腔へ入るため、使用は医師が判断します。");
+R("boerhaave","食道破裂疑いの CT で、食道外へ経口造影剤が漏れている。対応は？",NOW,null,"食道外への漏出は手術・ドレナージにつながる所見です。");
+T("empyema","膿胸の胸膜の造影を評価しやすい時相は？","胸膜が造影される静脈相",["早期の動脈相だけ","単純 CT だけ","造影 10 分以上後だけ"],"split pleura sign は静脈相で分かりやすくなります。");
+R("empyema","肺炎の経過中の CT で、レンズ状の液体の中にガスがある。対応は？","気管支胸膜瘻などの可能性として医師へ伝える",null,"ガスを含む膿胸は治療方針が変わる重要な所見です。");
+
+/* ---- 腹部・骨盤 ---- */
+T("sbo","腸閉塞の閉塞部（移行部）を探すのに有用な再構成は？","冠状断",["骨条件","肺野条件だけ","厚いスライスの横断"],"拡張した腸管を長く追えるため、拡張と虚脱の境目を見つけやすくなります。");
+R("sbo","癒着性腸閉塞疑いの CT で、一部の腸管壁の造影不良と腹水の増加がある。対応は？","絞扼の可能性として直ちに医師へ伝える",null,"絞扼は腸管壊死に進み、緊急手術が必要になります。");
+T("appendicitis","虫垂の全長を追うのに有用な再構成は？","冠状断",["骨条件","肺野条件","脳条件"],"虫垂は位置や向きの個人差が大きく、冠状断で追うと見つけやすくなります。");
+R("appendicitis","虫垂炎疑いの CT で、虫垂周囲に腸管外のガスと液体貯留がある。対応は？","穿孔・膿瘍の可能性として医師へ伝える",null,"穿孔や膿瘍は治療方針（手術・ドレナージ）を変えます。");
+T("diverticulitis","右下腹部痛で憩室炎と虫垂炎を区別するために大切なことは？","回盲部と虫垂を丁寧に確認する",["左下腹部だけを見る","骨条件で見る","撮像範囲を上腹部だけにする"],"日本では右側の結腸憩室炎も多く、虫垂炎との区別が重要です。");
+R("diverticulitis","憩室炎の患者の CT で、腹腔内に遊離ガスがある。対応は？","穿孔として直ちに医師へ伝える",null,"穿孔性憩室炎は手術が必要になることがあります。");
+T("cholecystitis","胆石について正しいのは？","CT では見えない胆石も多いので、超音波の所見も確認する",["胆石は必ず CT で見える","胆石は MRI では見えない","胆石は造影しないと見えない"],"コレステロール結石は胆汁と同じくらいの濃度で、CT で写らないことがあります。");
+R("cholecystitis","胆嚢炎疑いの CT で、胆嚢の壁内にガスがある。対応は？","気腫性胆嚢炎として直ちに医師へ伝える",null,"気腫性胆嚢炎は壊疽・穿孔に進みやすい重症型です。");
+T("cholangitis","胆管結石を非侵襲的に評価する MRI は？","MRCP",["頭部の拡散強調像","MRA","T2*強調像"],"MRCP は胆汁を明るく写し、結石を欠損として描出します。");
+R("cholangitis","発熱と黄疸の高齢者。CT で総胆管結石と胆管拡張があり、撮影中に血圧が下がってきた。対応は？",NOW,null,"重症胆管炎は敗血症性ショックに進み、緊急の胆道ドレナージが必要です。");
+T("pancreatitis","急性膵炎の造影 CT で壊死を評価しやすい時相は？","膵実質相〜門脈相",["単純 CT だけ","造影 10 分後だけ","骨条件"],"膵実質がよく造影される時相で、造影不良域（壊死）が分かります。");
+R("pancreatitis","急性膵炎の CT で、膵周囲に強く造影される結節（仮性動脈瘤の疑い）がある。対応は？","出血のリスクとして直ちに医師へ伝える",null,"仮性動脈瘤の破裂は大出血につながります。");
+T("hcc","肝細胞癌のダイナミック CT で特に重要な時相は？","後期動脈相（早期濃染）と門脈相・平衡相（washout）",["単純 CT だけ","門脈相だけ","骨条件"],"早期濃染と washout の組み合わせが診断の決め手です。");
+R("hcc","肝硬変の患者が急な腹痛とショック。CT で肝腫瘤の周囲と腹腔内に高吸収の液体がある。対応は？","腫瘍破裂による腹腔内出血として直ちに医師へ伝える",null,"肝細胞癌の破裂は緊急の止血（塞栓術）が必要です。");
+T("liver-abscess","肝膿瘍の評価で有用な造影時相は？","動脈相と門脈相",["単純 CT だけ","造影 10 分後だけ","肺野条件"],"辺縁の造影と周囲肝実質の濃染（炎症）を評価します。");
+R("liver-abscess","肝膿瘍の患者の CT で、膿瘍の壁が途切れ、腹腔内に液体が広がっている。対応は？","破裂の可能性として直ちに医師へ伝える",null,"膿瘍の破裂は腹膜炎・敗血症につながります。");
+T("liver-injury","外傷全身 CT で肝損傷の活動性出血を評価するのに必要なのは？","動脈相と門脈相",["単純 CT だけ","門脈相だけ","骨条件だけ"],"動脈相の造影剤漏出が塞栓術の判断に使われます。");
+R("liver-injury","外傷 CT で肝臓の裂傷内に造影剤の漏出がある。対応は？","活動性出血として直ちに医師へ伝える",null,"止血処置（塞栓術・手術）の判断につながります。");
+T("spleen-injury","脾損傷の評価で門脈相が必要な理由は？","動脈相では正常な脾臓もまだらに造影され、損傷と紛らわしいため",["門脈相のほうが被ばくが少ないため","動脈相では脾臓が写らないため","門脈相でしか出血は見えないため"],"動脈相の不均一な造影（まだら脾）は正常所見です。");
+R("spleen-injury","脾損傷の CT で、脾臓内に造影剤の漏出がある。対応は？","活動性出血として直ちに医師へ伝える",null,"脾損傷は遅れて破裂することもあり、出血の所見は重要です。");
+T("kidney-injury","腎損傷で尿漏（腎盂・尿管の損傷）を評価するために必要なのは？","数分後の遅延相（排泄相）",["単純 CT だけ","早期動脈相だけ","肺野条件"],"排泄された造影剤（尿）が腎臓の外に漏れるかを見ます。");
+R("kidney-injury","腎損傷の CT で、腎臓全体が造影されない。対応は？","腎動脈損傷の可能性として直ちに医師へ伝える",null,"腎動脈損傷は腎臓を救うために時間が重要です。");
+T("ureter-stone","尿管結石と静脈石を区別する手がかりは？","結石の周りの尿管壁の輪（rim sign）",["結石のほうが必ず大きい","静脈石は CT で写らない","結石は必ず腎臓にある"],"静脈石には comet tail sign が見られることがあります。");
+R("ureter-stone","尿管結石の患者が発熱している。CT で水腎症がある。対応は？","閉塞性腎盂腎炎の可能性として医師へ伝える",null,"閉塞を伴う尿路感染は敗血症に進みやすく、緊急ドレナージが必要なことがあります。");
+T("pyelonephritis","腎盂腎炎の造影不良域を評価しやすい時相は？","腎実質相（〜排泄相）",["早期の動脈相だけ","単純 CT だけ","肺野条件"],"皮髄相では正常でも皮質と髄質の差があり、病変と区別しにくくなります。");
+R("pyelonephritis","糖尿病患者の腎盂腎炎疑い。CT で腎実質内にガスがある。対応は？","気腫性腎盂腎炎として直ちに医師へ伝える",null,"気腫性腎盂腎炎は致死率の高い重症感染症です。");
+T("aaa-rupture","高齢者の側腹部痛について注意すべきことは？","尿管結石と思われていても、腹部大動脈瘤破裂のことがある",["高齢者の側腹部痛はすべて尿管結石","大動脈は撮像範囲に入れなくてよい","単純 CT では大動脈は評価できない"],"破裂は尿管結石と誤診されやすい代表的な疾患です。");
+R("aaa-rupture","腰痛の高齢者の CT で、大動脈瘤の周囲に後腹膜血腫がある。対応は？","大動脈瘤破裂として最優先で医師へ伝える",null,"破裂は分単位で状態が変わる緊急疾患です。");
+T("sma-occlusion","上腸間膜動脈閉塞症の診断に必須の時相は？","動脈相",["単純 CT だけ","造影 10 分後だけ","門脈相だけ"],"動脈の造影欠損は動脈相でもっともはっきり見えます。");
+R("sma-occlusion","心房細動のある高齢者の腹痛。造影 CT で上腸間膜動脈が造影されない。対応は？","上腸間膜動脈閉塞として直ちに医師へ伝える",null,"時間とともに腸管壊死が進みます。");
+T("ischemic-colitis","虚血性大腸炎で壊死型を疑う所見は？","腸管の壁内ガスや造影不良",["軽い壁肥厚だけ","腸管内の便","正常な造影効果"],"壊死型は手術が必要になることがあります。");
+R("ischemic-colitis","虚血性大腸炎疑いの CT で、腸管壁内ガスと門脈内ガスがある。対応は？",NOW,null,"腸管壊死を示す所見です。");
+T("intussusception","腸重積の長軸像（sausage sign）を見るのに有用なのは？","冠状断・矢状断の再構成",["骨条件","肺野条件","厚いスライスの横断"],"重なった腸管の長さや先進部が分かりやすくなります。");
+R("intussusception","成人の腸重積の CT で、先進部に腫瘤があり、口側の腸管が拡張している。対応は？","腸閉塞を伴う所見として医師へ伝える",null,"成人の腸重積は腫瘍が原因のことが多く、手術が検討されます。");
+T("sigmoid-volvulus","S 状結腸軸捻転の CT で、撮像範囲について注意することは？","拡張した腸管で腹部が大きくなるので、範囲を広めにとる",["範囲を上腹部だけにする","骨盤は入れなくてよい","スカウト像を撮らない"],"腹部全体が膨らむため、撮り漏れが起こりやすくなります。");
+R("sigmoid-volvulus","高度の腹部膨満の高齢者。CT で S 状結腸がコーヒー豆状に拡張し、腸管壁内にガスがある。対応は？","壊死の可能性として直ちに医師へ伝える",null,"壊死があると内視鏡的整復ではなく手術になります。");
+T("obturator-hernia","原因の分からない腸閉塞で閉鎖孔ヘルニアを見逃さないためには？","撮像範囲に骨盤底（恥骨の下縁）まで含める",["腎臓の高さまでで止める","上腹部だけを撮る","骨条件だけで見る"],"閉鎖孔は骨盤の最下部にあり、範囲が足りないと写りません。");
+R("obturator-hernia","やせた高齢女性の腸閉塞。CT で右の閉鎖孔に腸管が入り込んでいる。対応は？","嵌頓ヘルニアとして直ちに医師へ伝える",null,"嵌頓は腸管壊死に進むため、早期の手術が必要です。");
+T("crc","CT コロノグラフィ（大腸 CT）のポイントは？","十分な送気と、腹臥位・仰臥位の 2 体位で撮る",["送気せずに撮る","1 体位だけで撮る","便が残っていても前処置は不要"],"腸管を十分に広げ、残渣や液体の移動で病変を見分けます。");
+R("crc","大腸癌の患者の CT で、腫瘍の口側の結腸が著しく拡張し、腹腔内に遊離ガスがある。対応は？","穿孔として直ちに医師へ伝える",null,"閉塞性大腸癌の穿孔は緊急手術の対象です。");
+T("pancreatic-ca","膵癌の評価に適した造影プロトコルは？","膵実質相と門脈相の 2 相以上",["遅延相 1 相だけ","単純 CT だけ","肺野条件"],"膵実質相で腫瘍のコントラストが最大になり、門脈相で静脈浸潤や肝転移を評価します。");
+R("pancreatic-ca","黄疸の患者。CT で膵頭部に乏血性の腫瘤と胆管拡張があり、高熱が出ている。対応は？","閉塞性胆管炎の合併の可能性として医師へ伝える",null,"胆管炎の合併は緊急の胆道ドレナージにつながります。");
+T("rcc","腎腫瘤の造影効果を判定するのに必要なのは？","単純 CT を撮り、造影後との CT 値の差を見る",["造影 CT だけを撮る","肺野条件で見る","骨条件で見る"],"一般に 20 HU 以上の上昇で造影効果ありと判断します。");
+R("rcc","健診で偶然見つかった腎腫瘤。患者さんは無症状。対応は？","通常の読影依頼の流れで報告する",ROUT_WRONG,"重要な所見ですが緊急ではありません。");
+T("enterocolitis","感染性腸炎の患者を撮影したあとに必要なことは？","接触予防策に従い、寝台・装置を清拭する",["特に何もしない","次の患者をすぐ入れる","アルコールが効かない病原体でも同じ方法でよい"],"ノロウイルスなどはアルコールが効きにくく、施設の手順（次亜塩素酸など）に従います。");
+R("enterocolitis","腸炎疑いの CT で、腸管壁内にガスがある。対応は？","腸管虚血の可能性として直ちに医師へ伝える",null,"腸管壁内ガスは虚血・壊死を示すことがあります。");
+T("psoas-abscess","腸腰筋膿瘍で、原因として合併しやすい病変を確認するには？","骨条件で脊椎（化膿性脊椎炎）も評価する",["肺野条件だけ見る","頭部を撮る","単純 CT だけで終える"],"腸腰筋膿瘍は化膿性脊椎炎から広がることがよくあります。");
+R("psoas-abscess","腸腰筋膿瘍の中にガスが多く、撮影中に患者の血圧が下がってきた。対応は？",NOW,null,"ガス産生菌による重症感染と敗血症性ショックの可能性があります。");
+T("ovarian-torsion","若年女性の下腹部痛で CT を撮る前に確認すべきことは？","妊娠の可能性（妊娠反応の結果）",["最終の食事の時間だけ","身長","眼鏡の有無"],"妊娠の可能性は撮影の可否と方法を左右します。");
+R("ovarian-torsion","下腹部痛の若年女性。CT で腫大した卵巣とねじれた茎がある。対応は？","卵巣を温存するには時間が重要なため、直ちに医師へ伝える",null,"茎捻転は時間がたつほど卵巣が壊死します。");
+T("ectopic","異所性妊娠破裂が疑われ、ショック状態の患者を撮影するときに正しいのは？","急変に備えて医師・看護師と協力し、最短で撮影する",["一人で時間をかけて撮る","すべての時相を追加する","患者を待合室で待たせる"],"ショック時の撮影は、検査の利益とリスクを医師が判断し、チームで行います。");
+R("ectopic","妊娠反応陽性の女性の腹痛。CT で骨盤内に高吸収の液体と付属器の輪状の腫瘤がある。対応は？","腹腔内出血として直ちに医師へ伝える",null,"破裂した異所性妊娠は緊急手術の対象です。");
+T("myoma","子宮の MRI で腸管の動きによるぼけを抑える方法は？","禁忌を確認したうえで、医師の指示により鎮痙剤を使う",["技師の判断で鎮痙剤を使う","加算回数を減らす","スライスを厚くするだけ"],"鎮痙剤は緑内障・心疾患などの禁忌を確認して使います。");
+R("myoma","子宮筋腫の経過観察 MRI。前回と変化がない。対応は？","通常の読影依頼の流れで報告する",ROUT_WRONG,"変化のない筋腫は待機的な所見です。");
+T("fournier","壊死性軟部組織感染症の CT で、撮像範囲として適切なのは？","腹部から大腿まで広くとる",["会陰部だけ","骨盤の上半分だけ","胸部だけ"],"感染は筋膜に沿って急速に広がるため、範囲の把握が手術計画に必要です。");
+R("fournier","会陰部の腫れと発熱のある糖尿病患者。CT で皮下や筋膜に沿ったガスがある。対応は？","緊急手術の対象になりうるため直ちに医師へ伝える",null,"壊死性軟部組織感染症は数時間で進行する緊急疾患です。");
+
+</script>
+<script>
+/* ===== 準備 ===== */
+CASES.sort((a,b) => REGIONS.indexOf(a.reg) - REGIONS.indexOf(b.reg));
+const BY_ID = Object.fromEntries(CASES.map(c => [c.id, c]));
+const TPL_MOD = {"head-vent":"CT","head-base":"CT","head-post":"CT","face-orbit":"CT","face-max":"CT","neck":"CTC","spine-l":"T2","spine-c":"T2","chest":"CTC","chest-heart":"CTC","chest-lung":"CTL","abd-upper":"CTC","abd-kidney":"CTC","abd-mid":"CTC","abd-low":"CTC","pelvis":"CTC","hip-cor":"CT","knee-sag":"PDFS","shoulder-cor":"T2"};
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const shuffle = a => { a = a.slice(); for (let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; };
+const store = {
+  get(k,d){ try{ const v = localStorage.getItem(k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+const sevRank = {crit:0, urg:1, rout:2};
+
+/* ===== 表示テーマ ===== */
+function setTheme(t){
+  document.documentElement.classList.remove("ui-dark","ui-light","ui-auto");
+  document.documentElement.classList.add("ui-"+t);
+  document.querySelectorAll("[data-theme-set]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.themeSet===t)));
+  store.set("ctmri-theme", t);
+}
+document.querySelectorAll("[data-theme-set]").forEach(b => b.onclick = () => setTheme(b.dataset.themeSet));
+setTheme(store.get("ctmri-theme","dark"));
+
+/* ===== タブ ===== */
+function showView(name){
+  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.view===name)));
+  document.querySelectorAll(".view").forEach(v => v.hidden = v.id !== "view-"+name);
+  if (name==="quiz" && !quizState.quiz) startQuiz("quiz");
+  if (name==="report" && !quizState.report) startQuiz("report");
+  window.scrollTo({top:0});
+}
+document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
+
+/* ===== 症例図鑑 ===== */
+const MGRP = m => m.startsWith("CT") ? "CT" : "MRI";
+const MOD_ORDER = ["CT","CTC","CTL","CTB","T1","T1C","T1FS","T2","FLAIR","DWI","T2S","STIR","PDFS"];
+const MOD_SHORT = {CT:"単純CT",CTC:"造影CT",CTL:"肺野条件",CTB:"骨条件",T1:"T1",T1C:"造影T1",T2:"T2",FLAIR:"FLAIR",DWI:"DWI（拡散強調）",T2S:"T2*",STIR:"STIR",PDFS:"脂肪抑制PD",T1FS:"脂肪抑制T1"};
+let mod = "すべて";
+const modHit = (v) => mod==="すべて" || (mod==="CT"||mod==="MRI" ? MGRP(v.m)===mod : v.m===mod);
+let region = "すべて", query = "", current = CASES[0].id, viewIdx = 0, showAnn = true, showAnat = false;
+function matches(c){
+  if (region!=="すべて" && c.reg!==region) return false;
+  if (!c.v.some(modHit)) return false;
+  if (!query) return true;
+  const hay = (c.name+" "+(c.alias||"")+" "+c.keys.join(" ")+" "+c.v.map(v=>(v.label||"")+" "+MOD_NAME[v.m]).join(" ")).toLowerCase();
+  return query.toLowerCase().split(/\s+/).every(w => hay.includes(w));
+}
+function renderFilters(){
+  const regions = ["すべて", ...REGIONS];
+  $("#filters").innerHTML = regions.map(r => {
+    const n = r==="すべて" ? CASES.length : CASES.filter(c=>c.reg===r).length;
+    return `<button class="chip" aria-pressed="${r===region}" data-r="${r}">${r}<span class="n">${n}</span></button>`;
+  }).join("");
+  $("#filters").querySelectorAll("button").forEach(b => b.onclick = () => { region = b.dataset.r; renderFilters(); renderModFilter(); renderList(); });
+}
+function renderModFilter(){
+  const inReg = CASES.filter(c => region==="すべて" || c.reg===region);
+  const cnt = test => inReg.filter(c => c.v.some(test)).length;
+  const grp = mod==="すべて" ? null : (mod==="CT"||mod==="MRI" ? mod : MGRP(mod));
+  const top = ["すべて","CT","MRI"].map(g => {
+    const n = g==="すべて" ? inReg.length : cnt(v=>MGRP(v.m)===g);
+    const on = g===mod || (g===grp && mod!==g);
+    return `<button class="chip" aria-pressed="${on}" data-m="${g}">${g==="すべて"?"すべてのモダリティ":g}<span class="n">${n}</span></button>`;
+  }).join("");
+  const subs = grp ? MOD_ORDER.filter(m => MGRP(m)===grp).map(m => [m, cnt(v=>v.m===m)]).filter(([,n])=>n) : [];
+  $("#modfilter").innerHTML = `<span class="lab">モダリティ・撮像条件</span><div class="row">${top}</div>
+    ${subs.length ? `<div class="row sub">${subs.map(([m,n])=>`<button class="chip" aria-pressed="${mod===m}" data-m="${m}">${MOD_SHORT[m]}<span class="n">${n}</span></button>`).join("")}</div>` : ""}`;
+  $("#modfilter").querySelectorAll("button").forEach(b => b.onclick = () => {
+    const m = b.dataset.m; mod = (m===mod && !["すべて","CT","MRI"].includes(m)) ? MGRP(m) : m;
+    renderModFilter(); renderList();
+    const first = CASES.find(matches); if (first && !CASES.filter(matches).some(c=>c.id===current)) openCase(first.id); else if (BY_ID[current]) openCase(current);
+  });
+}
+function renderList(){
+  const list = CASES.filter(matches);
+  $("#count").textContent = `${list.length} 症例` + (mod!=="すべて" ? `（${mod==="CT"||mod==="MRI"?mod:MOD_SHORT[mod]} の画像あり）` : "");
+  let html = "", last = "";
+  list.forEach(c => {
+    if (c.reg !== last && region==="すべて"){ html += `<div class="listhead">${c.reg}</div>`; last = c.reg; }
+    html += `<button class="caseitem" aria-current="${c.id===current}" data-id="${c.id}">
+      <span class="sev-${c.sev}"></span>
+      <span><strong>${c.name}</strong><small>${SEV[c.sev]}${[...new Set(c.v.map(v=>MOD_SHORT[v.m]))].map(t=>`<span class="modtag">${t}</span>`).join("")}</small></span></button>`;
+  });
+  $("#caselist").innerHTML = html || `<p class="hint">該当する症例がありません。キーワードを変えてみてください。</p>`;
+  $("#caselist").querySelectorAll(".caseitem").forEach(b => b.onclick = () => { openCase(b.dataset.id); if (innerWidth<860) $("#detail").scrollIntoView({behavior:"smooth"}); });
+}
+$("#q").addEventListener("input", e => { query = e.target.value.trim(); renderList(); });
+function openCase(id){ current = id; const i = BY_ID[id].v.findIndex(modHit); viewIdx = i<0 ? 0 : i; renderList(); renderDetail(); }
+const li = arr => `<ul>${arr.map(x=>`<li>${x}</li>`).join("")}</ul>`;
+function renderDetail(){
+  const c = BY_ID[current], v = c.v[viewIdx];
+  const mods = [...new Set(c.v.map(x=>x.m.startsWith("CT")?"CT":"MRI"))].join(" / ");
+  $("#detail").innerHTML = `
+    <div class="dhead"><h2>${c.name}</h2>
+      <span class="tag ${c.sev}">${SEV[c.sev]}</span><span class="tag">${c.reg}</span><span class="tag">${mods}</span></div>
+    <div class="dgrid">
+      <div class="imgpanel">
+        <div class="scanwrap" id="scan">${renderView(v)}</div>
+        ${c.v.length>1 ? `<div class="imgtools">${c.v.map((x,i)=>`<button class="chip" aria-pressed="${i===viewIdx}" data-i="${i}">${x.label||MOD_NAME[x.m]}</button>`).join("")}</div>` : ""}
+        <div class="layer">
+          <button class="find" id="tgAnn" aria-pressed="${showAnn}">所見</button>
+          <button class="anatb" id="tgAnat" aria-pressed="${showAnat}">解剖</button>
+        </div>
+        <p class="tplname">${v.label||MOD_NAME[v.m]} ・ ${TPL[v.tpl].name}</p>
+        <p class="wl">${v.wl||""}</p>
+        <p class="caption">${v.cap}</p>
+      </div>
+      <div class="sections">
+        <section><h3>典型的な症状・背景</h3>${li(c.sx)}
+          ${c.keys.length ? `<div class="keychips" style="margin-top:6px">${c.keys.map(k=>`<button class="chip" data-key="${k}">${k}</button>`).join("")}</div>` : ""}</section>
+        <section><h3>CT の所見</h3>${li(c.ct)}</section>
+        <section><h3>MRI の所見</h3>${li(c.mri)}</section>
+        <section class="tech"><h3>技師のポイント（撮像・表示）</h3>${li(c.tech)}</section>
+        <section class="alert"><h3>見逃し注意・すぐ医師に伝えたい所見</h3>${li(c.rep)}</section>
+        <section><h3>鑑別・まぎらわしいもの</h3>${li(c.ddx)}</section>
+      </div>
+    </div>`;
+  applyLayers();
+  $("#tgAnn").onclick = () => { showAnn = !showAnn; $("#tgAnn").setAttribute("aria-pressed", showAnn); applyLayers(); };
+  $("#tgAnat").onclick = () => { showAnat = !showAnat; $("#tgAnat").setAttribute("aria-pressed", showAnat); applyLayers(); };
+  $("#detail").querySelectorAll(".imgtools .chip").forEach(b => b.onclick = () => { viewIdx = +b.dataset.i; renderDetail(); });
+  $("#detail").querySelectorAll(".keychips .chip").forEach(b => b.onclick = () => { selSym = new Set([b.dataset.key]); renderSymptom(); showView("symptom"); });
+}
+function applyLayers(){ const s = $("#scan svg"); s.classList.toggle("show-ann", showAnn); s.classList.toggle("show-anat", showAnat); }
+
+/* ===== 症状から探す ===== */
+let selSym = new Set();
+function renderSymptom(){
+  $("#symchips").innerHTML = SYMPTOM_GROUPS.map(([g, keys]) => `
+    <div class="symgroup"><h3>${g}</h3><div class="chips">
+      ${keys.map(k => `<button class="chip" aria-pressed="${selSym.has(k)}" data-k="${k}">${k}</button>`).join("")}
+    </div></div>`).join("");
+  $("#symchips").querySelectorAll("button").forEach(b => b.onclick = () => { selSym.has(b.dataset.k) ? selSym.delete(b.dataset.k) : selSym.add(b.dataset.k); renderSymptom(); });
+  $("#symselected").innerHTML = selSym.size
+    ? [...selSym].map(k=>`<button class="chip" aria-pressed="true" data-k="${k}">${k} ×</button>`).join("") + `<button class="btn ghost" id="symclear" style="padding:2px 10px;font-size:.8rem">すべて解除</button>`
+    : `<span class="hint">左の一覧から症状を選んでください（複数選択できます）。</span>`;
+  $("#symselected").querySelectorAll(".chip").forEach(b => b.onclick = () => { selSym.delete(b.dataset.k); renderSymptom(); });
+  if ($("#symclear")) $("#symclear").onclick = () => { selSym.clear(); renderSymptom(); };
+  if (!selSym.size){ $("#symresults").innerHTML = ""; return; }
+  const scored = CASES.map(c => { const hit = c.keys.filter(k => selSym.has(k)); return {c, hit}; })
+    .filter(x => x.hit.length)
+    .sort((a,b) => b.hit.length - a.hit.length || sevRank[a.c.sev] - sevRank[b.c.sev]);
+  const n = selSym.size;
+  $("#symresults").innerHTML = scored.length ? scored.slice(0,30).map(({c,hit}) => `
+    <button class="result-item" data-id="${c.id}">
+      <span class="sev-${c.sev}" style="align-self:stretch"></span>
+      <span><strong>${c.name}</strong><small>${SEV[c.sev]} ・ ${c.reg} ・ 一致：${hit.join("、")}</small>
+        <div class="bar"><span style="width:${Math.round(hit.length/n*100)}%"></span></div></span>
+      <span class="match">${hit.length}/${n}</span>
+    </button>`).join("") : `<p class="hint">一致する症例がありません。</p>`;
+  $("#symresults").querySelectorAll(".result-item").forEach(b => b.onclick = () => { openCase(b.dataset.id); showView("atlas"); });
+}
+
+/* ===== クイズ ===== */
+const QTYPES = {img:"画像 → 疾患", sym:"症状 → 疾患", anat:"解剖", tech:"撮像のポイント"};
+let qTypes = new Set(store.get("ctmri-qtypes", ["img","sym","anat","tech"])), qRegion = "すべて";
+function renderSetup(){
+  $("#qsetup").innerHTML = `
+    <fieldset><legend>出題の種類</legend><div class="filters">${Object.entries(QTYPES).map(([k,l])=>`<button class="chip" aria-pressed="${qTypes.has(k)}" data-t="${k}">${l}</button>`).join("")}</div></fieldset>
+    <fieldset><legend>範囲</legend><div class="filters">${["すべて",...REGIONS].map(r=>`<button class="chip" aria-pressed="${r===qRegion}" data-r="${r}">${r}</button>`).join("")}</div></fieldset>`;
+  $("#qsetup").querySelectorAll("[data-t]").forEach(b => b.onclick = () => {
+    const t = b.dataset.t; if (qTypes.has(t) && qTypes.size>1) qTypes.delete(t); else qTypes.add(t);
+    store.set("ctmri-qtypes",[...qTypes]); renderSetup(); startQuiz("quiz"); });
+  $("#qsetup").querySelectorAll("[data-r]").forEach(b => b.onclick = () => { qRegion = b.dataset.r; renderSetup(); startQuiz("quiz"); });
+}
+const quizState = {};
+let rRegion = "すべて";
+function renderRSetup(){
+  $("#rsetup").innerHTML = `<fieldset><legend>範囲（${CASES.filter(c=>c.repQ).length} 問から 10 問）</legend><div class="filters">${["すべて",...REGIONS].map(r=>`<button class="chip" aria-pressed="${r===rRegion}" data-r="${r}">${r}</button>`).join("")}</div></fieldset>`;
+  $("#rsetup").querySelectorAll("[data-r]").forEach(b => b.onclick = () => { rRegion = b.dataset.r; renderRSetup(); startQuiz("report"); });
+}
+function pickOthers(c, pool, n=3){
+  const same = shuffle(pool.filter(o => o.id!==c.id && o.reg===c.reg));
+  const rest = shuffle(pool.filter(o => o.id!==c.id && o.reg!==c.reg));
+  return [...same, ...rest].slice(0,n);
+}
+function buildPool(mode){
+  if (mode==="report")
+    return shuffle(CASES.filter(c=>c.repQ && (rRegion==="すべて" || c.reg===rRegion))).slice(0,10).map(c => ({kind:"緊急所見への対応", c, img:renderView(c.v[0]), ann:true, ...c.repQ}));
+  const pool = [], dz = CASES.filter(c => c.reg!=="アーチファクト");
+  const inR = c => qRegion==="すべて" || c.reg===qRegion;
+  if (qTypes.has("img")) dz.filter(inR).forEach(c => {
+    const opts = shuffle([c.name, ...pickOthers(c, dz).map(o=>o.name)]);
+    pool.push({kind:QTYPES.img, c, img:renderView(c.v[0]), ann:false, q:"この模式図で最も考えられる疾患は？", opts, a:opts.indexOf(c.name), exp:c.v[0].cap});
+  });
+  if (qTypes.has("sym")) dz.filter(inR).forEach(c => {
+    const opts = shuffle([c.name, ...pickOthers(c, dz).map(o=>o.name)]);
+    pool.push({kind:QTYPES.sym, c, img:null, stem:c.sx.join(" ／ "), q:"この症状・背景から最も考えたい疾患は？", opts, a:opts.indexOf(c.name),
+      exp:`${c.name}の典型像です。画像では「${c.ct[0]}」などを確認します。`});
+  });
+  if (qTypes.has("anat")){
+    const regTpl = {"頭部":["head-vent","head-base","head-post"],"頭頸部":["face-orbit","face-max","neck"],"脊椎":["spine-l","spine-c"],"胸部":["chest","chest-heart","chest-lung"],"腹部・骨盤":["abd-upper","abd-kidney","abd-mid","abd-low","pelvis"],"骨・関節":["hip-cor","knee-sag","shoulder-cor"]};
+    const tpls = qRegion==="すべて" ? Object.keys(TPL_MOD) : regTpl[qRegion];
+    tpls.forEach(t => { const an = anatOf(t); shuffle(an.map((_,i)=>i)).slice(0,3).forEach(i => {
+      const name = an[i][4], others = shuffle(an.filter((_,j)=>j!==i).map(x=>x[4])).slice(0,3), opts = shuffle([name,...others]);
+      pool.push({kind:QTYPES.anat, c:null, tpl:t, img:renderView({tpl:t,m:TPL_MOD[t]},{hl:i}), q:"丸で示した構造はどれ？", opts, a:opts.indexOf(name),
+        exp:`${TPL[t].name}の「${name}」です。`, anatAfter:renderView({tpl:t,m:TPL_MOD[t]})});
+    }); });
+  }
+  if (qTypes.has("tech")) CASES.filter(c=>c.techQ && inR(c)).forEach(c => pool.push({kind:QTYPES.tech, c, img:null, ...c.techQ}));
+  return shuffle(pool).slice(0,10);
+}
+function startQuiz(mode){
+  const qs = buildPool(mode).map(q => { const order = shuffle(q.opts.map((_,i)=>i)); return {...q, opts:order.map(i=>q.opts[i]), a:order.indexOf(q.a)}; });
+  quizState[mode] = {qs, i:0, score:0, wrong:[]};
+  renderQ(mode);
+}
+const rootOf = mode => $(`#${mode==="quiz"?"quiz":"report"}-root`);
+function renderQ(mode){
+  const st = quizState[mode], root = rootOf(mode);
+  if (!st.qs.length){ root.innerHTML = `<p class="hint">この条件では出題できる問題がありません。種類か範囲を変えてください。</p>`; return; }
+  if (st.i >= st.qs.length) return renderResult(mode);
+  const q = st.qs[st.i];
+  root.innerHTML = `
+    <div class="qbar"><span class="progress">問 ${st.i+1} / ${st.qs.length}　正解 ${st.score}</span>
+      <button class="btn ghost" id="${mode}-restart">問題を入れ替える</button></div>
+    <div class="qcard ${q.img?"":"noimg"}">
+      ${q.img ? `<div class="scanwrap" id="${mode}-img">${q.img}</div>` : ""}
+      <div>
+        <div class="kind">${q.kind}</div>
+        ${q.stem ? `<p class="stem">${esc(q.stem)}</p>` : ""}
+        <h2>${esc(q.q)}</h2>
+        <div class="opts">${q.opts.map((o,i)=>`<button class="opt" data-i="${i}">${esc(o)}</button>`).join("")}</div>
+        <div id="${mode}-fb"></div>
+      </div>
+    </div>`;
+  if (q.img && q.ann) root.querySelector("svg").classList.add("show-ann");
+  $(`#${mode}-restart`).onclick = () => startQuiz(mode);
+  root.querySelectorAll(".opt").forEach(b => b.onclick = () => answer(mode, +b.dataset.i));
+}
+function answer(mode, i){
+  const st = quizState[mode], q = st.qs[st.i], root = rootOf(mode);
+  const ok = i===q.a; if (ok) st.score++; else st.wrong.push(q);
+  root.querySelectorAll(".opt").forEach((b,j) => { b.disabled = true; if (j===q.a) b.classList.add("correct"); else if (j===i) b.classList.add("wrong"); });
+  if (q.anatAfter){ $(`#${mode}-img`).innerHTML = q.anatAfter; $(`#${mode}-img svg`).classList.add("show-anat"); }
+  else if (q.img) root.querySelector("svg").classList.add("show-ann");
+  $(`#${mode}-fb`).innerHTML = `<div class="feedback"><b class="${ok?"good":"bad"}">${ok?"正解です。":"惜しい。"}</b> ${esc(q.exp)}</div>
+    <div class="actions"><button class="btn" id="${mode}-next">${st.i+1<st.qs.length?"次の問題へ":"結果を見る"}</button>
+    ${q.c ? `<button class="btn ghost" id="${mode}-see">「${q.c.name}」を図鑑で見る</button>` : ""}</div>`;
+  $(`#${mode}-next`).onclick = () => { st.i++; renderQ(mode); };
+  if (q.c) $(`#${mode}-see`).onclick = () => { openCase(q.c.id); showView("atlas"); };
+  $(`#${mode}-next`).focus();
+}
+function renderResult(mode){
+  const st = quizState[mode], root = rootOf(mode);
+  const key = "ctmri-best-"+mode, best = Math.max(store.get(key,0), st.score); store.set(key,best);
+  const weak = [...new Map(st.wrong.filter(q=>q.c).map(q=>[q.c.id,q.c])).values()];
+  const anatMiss = st.wrong.filter(q=>q.tpl).length;
+  root.innerHTML = `<div class="result">
+    <div class="score">${st.score} / ${st.qs.length}</div>
+    <p>これまでの最高：${best} / ${st.qs.length}</p>
+    ${weak.length ? `<p>復習するとよい症例：</p><ul>${weak.map(c=>`<li><a href="#" data-id="${c.id}">${c.name}</a></li>`).join("")}</ul>` : ""}
+    ${anatMiss ? `<p>解剖の問題で ${anatMiss} 問まちがえました。図鑑の「解剖」ボタンで構造を確認できます。</p>` : ""}
+    ${!weak.length && !anatMiss ? "<p>全問正解です。</p>" : ""}
+    <div class="actions"><button class="btn" id="${mode}-again">もう一度挑戦する</button></div></div>`;
+  $(`#${mode}-again`).onclick = () => startQuiz(mode);
+  root.querySelectorAll("a[data-id]").forEach(a => a.onclick = e => { e.preventDefault(); openCase(a.dataset.id); showView("atlas"); });
+}
+
+renderFilters(); renderModFilter(); renderList(); renderDetail(); renderSymptom(); renderSetup(); renderRSetup();
+</script>
+<script>
+/* オフライン対応（HTTPS で公開したときだけ有効） */
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>
